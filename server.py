@@ -11,11 +11,13 @@ from models import MNIST_CNN
 from concurrent.futures import ThreadPoolExecutor
 from utils.merge_grads import merge_grads
 import torch.optim as optim
+import time
 # import requests
 
 SEED = 2646
 random.seed(SEED)
 torch.manual_seed(SEED)
+shared_space = '/tmp/splitLearning'
 
 ThreadCount = 0
 
@@ -67,28 +69,40 @@ class AcceptClients(Thread):
         self.limit = limit
     
 
+
+#####################################################################
+##### correct this implementation to detect new clients joining #####
+#####################################################################
     def run(self):
-        ServerSocket = socket.socket()
-        try:
-            ServerSocket.bind((self.host, self.port))
-            print('Waiting for a Connection...')
-        except socket.error as e:
-            print(e)
-        ServerSocket.listen(10)
+        # ServerSocket = socket.socket()
+        print('Waiting for a Connection...')
         i = 0
-        # while self.keepRunning and i < self.limit:
         while i < self.limit:
-            # print('Hello')
-            conn, address = ServerSocket.accept()
-            client_id = conn.recv(4096).decode()
-            connected_clients[client_id] = ConnectedClient(client_id, conn, address)
-            # connected_clients[client_id].connect()
-            print(f'\n[*] Connected to: {client_id}:{address[0]}:{address[1]}')
-            increaseThreadCount()
-            print(f'Total clients connected: {ThreadCount}')
-            i += 1
+            clients = os.listdir(shared_space)
+            i = len(clients)
+            for client_id in clients:
+                if not client_id in connected_clients:
+                    conn = f'{shared_space}/{client_id}'
+                    connected_clients[client_id] = ConnectedClient(client_id, conn)
+                    print(f'\n[*] Connected to: {client_id}')
+                    increaseThreadCount()
+                    print(f'Total clients connected: {ThreadCount}')
+            else:
+                time.sleep(0.1)
+
+            # i = 0
+        # while self.keepRunning and i < self.limit:
+        # while i < self.limit:
+        #     conn, address = ServerSocket.accept()
+        #     client_id = conn.recv(4096).decode()
+        #     connected_clients[client_id] = ConnectedClient(client_id, conn, address)
+        #     # connected_clients[client_id].connect()
+        #     print(f'\n[*] Connected to: {client_id}:{address[0]}:{address[1]}')
+        #     increaseThreadCount()
+        #     print(f'Total clients connected: {ThreadCount}')
+        #     i += 1
         
-        return ServerSocket
+        # return ServerSocket
         # self.keepRunning = False
 
         # ServerSocket.close()

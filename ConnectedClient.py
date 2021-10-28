@@ -1,5 +1,5 @@
 from threading import Thread
-from utils.connections import is_socket_closed
+# from utils.connections import is_socket_closed
 from utils.connections import send_object
 from utils.connections import get_object
 import pickle
@@ -10,7 +10,6 @@ import torch
 
 def handle(client, addr, file):
     buffsize = 1024
-    # file = '/home/ashutosh/score_report.pdf'
     # print('File size:', os.path.getsize(file))
     fsize = struct.pack('!I', len(file))
     print('Len of file size struct:', len(fsize))
@@ -34,14 +33,14 @@ def handle(client, addr, file):
 
 class ConnectedClient(object):
     # def __init__(self, id, conn, address, loop_time=1/60, *args, **kwargs):
-    def __init__(self, id, conn, address, *args, **kwargs):
+    def __init__(self, id, conn, *args, **kwargs):
         super(ConnectedClient, self).__init__(*args, **kwargs)
         # self.q = queue.Queue()
         # self.timeout = loop_time
         # Thread.__init__(self)
         self.id = id
         self.conn = conn
-        self.address = address
+        # self.address = address
         self.front_model = None
         self.back_model = None
         self.center_model = None
@@ -85,14 +84,14 @@ class ConnectedClient(object):
 
 
     def disconnect(self):
-        if not is_socket_closed(self.conn):
-            self.conn.close()
-            return True
-        else:
-            return False
+        # if not is_socket_closed(self.conn):
+        #     self.conn.close()
+        #     return True
+        # else:
+        #     return False
+        return True
 
 
-    # def _send_model(self):
     def send_model(self):
         model = {'front': self.front_model, 'back': self.back_model}
         send_object(self.conn, model)
@@ -100,8 +99,10 @@ class ConnectedClient(object):
 
 
     def send_optimizers(self):
-        # This is just a sample code and NOT optimizers. Write code for initializing optimizers
-        optimizers = {'front': self.front_model.parameters(), 'back': self.back_model.parameters()}
+        # This is just a dummy code and NOT real optimizers. Write code for initializing optimizers
+        # optimizers are currently initialized at the client side
+        optimizers = {'front': optim.Adadelta(self.front_model.parameters(), lr=0.1),
+                    'back': optim.Adadelta(self.back_model.parameters(), lr=0.1)}
         send_object(self.conn, optimizers)
 
 
@@ -125,4 +126,4 @@ class ConnectedClient(object):
         send_object(self.conn, self.remote_activations1.grad)
 
     # def send_model(self):
-    #     self.onThread(self._send_model)        
+    #     self.onThread(self._send_model)

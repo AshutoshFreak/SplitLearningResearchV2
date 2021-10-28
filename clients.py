@@ -1,8 +1,8 @@
 import os
 import random
 import string
-import socket
-import tqdm
+# import socket
+# import tqdm
 import requests
 import sys
 import threading
@@ -156,7 +156,7 @@ if __name__ == "__main__":
                 executor.submit(client.send_remote_activations1())
             end = time.time()
             time_taken['send_remote_activations1'] += end-start
-
+            print('Hello')
 
             start = time.time()
             for _, client in clients.items():

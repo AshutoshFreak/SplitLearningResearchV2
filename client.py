@@ -1,15 +1,17 @@
 import os
 import torch
 import torch.nn.functional as F
-import socket
+# import socket
 from threading import Thread
-from utils.connections import is_socket_closed
+# from utils.connections import is_socket_closed
 from utils.connections import send_object
 from utils.connections import get_object
 from utils.split_dataset import DatasetFromSubset
 import pickle
 import queue
 import struct
+import errno
+
 # pylint: disable=too-many-instance-attributes
 # pylint: disable=invalid-name
 # pylint: disable=missing-function-docstring
@@ -17,8 +19,24 @@ import struct
 
 # class SeverProtocol:
 
+shared_space = '/tmp/splitLearning'
 
 
+class Barrier():
+    def __init__(self):
+        self.open = False
+    
+    def open_it(self):
+        self.open = True
+    
+    def close_it(self):
+        self.open = False
+    
+    def is_open(self):
+        return self.open
+
+    def is_closed(self):
+        return not self.open
 
 
 class Client(Thread):
@@ -172,26 +190,41 @@ class Client(Thread):
                                                 shuffle=True)
 
 
-    def connect_server(self, host='localhost', port=8000, BUFFER_SIZE=4096):
-        self.socket = socket.socket()
-        print(f"[*] Client {self.id} connecting to {host}:{port}")
+    def connect_server(self):
         try:
-            self.socket.connect((host, port))
-            print(f'[*] Client {self.id} connected! {self.id} address: {self.socket.getsockname()[0]}:{self.socket.getsockname()[1]}\n')
-            self.socket.sendall(str.encode(self.id))
-            return True
+            self.socket = f'{shared_space}/{self.id}'
+            try:
+                os.makedirs(self.socket)
+            except OSError as exc:
+                if exc.errno != errno.EEXIST:
+                    raise
+                pass
+            barrier = Barrier()
+            with open(f'{self.socket}/barrier', 'wb') as bar:
+                pickle.dump(barrier, bar)
+        except:
+            print(f'[*] Client {self.id} failed to create a shared space.')
+            raise
+        # self.socket = socket.socket()
+        # print(f"[*] Client {self.id} connecting to {host}:{port}")
+        # try:
+        #     self.socket.connect((host, port))
+        #     print(f'[*] Client {self.id} connected! {self.id} address: {self.socket.getsockname()[0]}:{self.socket.getsockname()[1]}\n')
+        #     self.socket.sendall(str.encode(self.id))
+        #     return True
 
-        except socket.error as e:
-            print(f'[*] Client {self.id} failed to connect to the server.\n{e}')
-            return False
+        # except socket.error as e:
+        #     print(f'[*] Client {self.id} failed to connect to the server.\n{e}')
+        #     return False
 
 
     def disconnect_server(self) -> bool:
-        if not is_socket_closed(self.socket):
-            self.socket.close()
-            return True
-        else:
-            return False
+        # if not is_socket_closed(self.socket):
+        #     self.socket.close()
+        #     return True
+        # else:
+        #     return False
+        return True
 
 
     def send_remote_activations1(self):
