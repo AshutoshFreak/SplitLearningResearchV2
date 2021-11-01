@@ -14,6 +14,8 @@ from utils.split_dataset import split_dataset
 from utils.client_simulation import generate_random_clients
 import matplotlib.pyplot as plt
 import time
+import server
+import multiprocessing
 
 
 # should get optimizers from the server instead of initializing here
@@ -71,13 +73,15 @@ def test(model, device, test_loader):
 
 
 if __name__ == "__main__":
-    num_clients = 2
+    num_clients = 1
     num_epochs = 10
+
+    server_pipe_endpoints = {}
 
     dataset = 'MNIST'
     print(f'Using dataset: {dataset}')
-    train_batch_size = 128
-    test_batch_size = 128
+    train_batch_size = 1
+    test_batch_size = 1
 
     time_taken = {'forward_front':0,
                     'send_remote_activations1':0,
@@ -121,7 +125,15 @@ if __name__ == "__main__":
         # all clients connect to the server
         for _, client in clients.items():
             executor.submit(client.connect_server())
-
+        
+        for client_id in clients:
+            server_pipe_endpoints[client_id] = clients[client_id].server_socket
+        
+        # start server and provide pipe endpoints
+        p = multiprocessing.Process(target=server.main, args=(server_pipe_endpoints,))
+        p.start()
+        
+        # print('Hello')
 
         # all clients get model from the server
         print('Getting model from server...', end='')
@@ -129,6 +141,8 @@ if __name__ == "__main__":
             executor.submit(client.get_model())
         print('Done')
 
+        for _, client in clients.items():
+            print(client.front_model)
 
         for _, client in clients.items():
             client.front_model.to(client.device)
@@ -136,6 +150,7 @@ if __name__ == "__main__":
             client.front_optimizer = optim.Adadelta(client.front_model.parameters(), lr=0.1)
             client.back_optimizer = optim.Adadelta(client.back_model.parameters(), lr=0.1)
             client.iterator = iter(client.train_DataLoader)
+
 
         # Training
         for epoch in range(num_epochs):
@@ -149,6 +164,7 @@ if __name__ == "__main__":
             end = time.time()
             time_taken['forward_front'] += end-start
 
+            print('Client side: Here1')
 
             start = time.time()
             # send activations to the server
@@ -157,6 +173,9 @@ if __name__ == "__main__":
             end = time.time()
             time_taken['send_remote_activations1'] += end-start
 
+            for _, client in clients.items():
+                print(client.remote_activations1)
+            print('Client side: Here2')
 
             start = time.time()
             for _, client in clients.items():
@@ -164,6 +183,7 @@ if __name__ == "__main__":
             end = time.time()
             time_taken['get_remote_activations2'] += end-start
 
+            print('Client side: Here3')
 
             start = time.time()
             for _, client in clients.items():
@@ -171,6 +191,7 @@ if __name__ == "__main__":
             end = time.time()
             time_taken['forward_back'] += end-start
 
+            print('Client side: Here4')
 
             start = time.time()
             for _, client in clients.items():
@@ -178,6 +199,7 @@ if __name__ == "__main__":
             end = time.time()
             time_taken['calculate_loss'] += end-start
 
+            print('Client side: Here5')
 
             start = time.time()
             for _, client in clients.items():
@@ -302,6 +324,3 @@ if __name__ == "__main__":
     #     print(client.front_model)
         # client.getFrontModel()
         # client.getBackModel()
-
-
-    

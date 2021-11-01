@@ -34,14 +34,14 @@ def handle(client, addr, file):
 
 class ConnectedClient(object):
     # def __init__(self, id, conn, address, loop_time=1/60, *args, **kwargs):
-    def __init__(self, id, conn, address, *args, **kwargs):
+    def __init__(self, id, conn, *args, **kwargs):
         super(ConnectedClient, self).__init__(*args, **kwargs)
         # self.q = queue.Queue()
         # self.timeout = loop_time
         # Thread.__init__(self)
         self.id = id
         self.conn = conn
-        self.address = address
+        # self.address = address
         self.front_model = None
         self.back_model = None
         self.center_model = None
@@ -51,7 +51,8 @@ class ConnectedClient(object):
         self.a1 = None
         self.a2 = None
         self.center_optimizer = None
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cpu')
 
 
     # def onThread(self, function, *args, **kwargs):
@@ -68,8 +69,11 @@ class ConnectedClient(object):
     #             self.idle()
 
     def forward_center(self):
+        # print('Hello1')
         self.activations2 = self.center_model(self.remote_activations1)
+        # print('Hello2')
         self.remote_activations2 = self.activations2.detach().requires_grad_(True)
+        # print('Hello3')
 
 
     def backward_center(self):

@@ -11,6 +11,7 @@ from models import MNIST_CNN
 from concurrent.futures import ThreadPoolExecutor
 from utils.merge_grads import merge_grads
 import torch.optim as optim
+import multiprocessing
 # import requests
 
 SEED = 2646
@@ -67,26 +68,30 @@ class AcceptClients(Thread):
         self.limit = limit
     
 
-    def run(self):
-        ServerSocket = socket.socket()
-        try:
-            ServerSocket.bind((self.host, self.port))
-            print('Waiting for a Connection...')
-        except socket.error as e:
-            print(e)
-        ServerSocket.listen(10)
-        i = 0
+    def run(self, server_pipe_endpoints):
+        # ServerSocket = socket.socket()
+        ServerSocket = multiprocessing.Pipe()
+        # try:
+        #     ServerSocket.bind((self.host, self.port))
+            # print('Waiting for a Connection...')
+        # except socket.error as e:
+        #     print(e)
+        # ServerSocket.listen(10)
+        # i = 0
         # while self.keepRunning and i < self.limit:
-        while i < self.limit:
+        # while i < self.limit:
             # print('Hello')
-            conn, address = ServerSocket.accept()
-            client_id = conn.recv(4096).decode()
-            connected_clients[client_id] = ConnectedClient(client_id, conn, address)
+        for client_id in server_pipe_endpoints:
+            # conn, address = ServerSocket.accept()
+            # client_id = conn.recv(4096).decode()
+            conn = server_pipe_endpoints[client_id]
+            connected_clients[client_id] = ConnectedClient(client_id, conn)
             # connected_clients[client_id].connect()
-            print(f'\n[*] Connected to: {client_id}:{address[0]}:{address[1]}')
+            # print(f'\n[*] Connected to: {client_id}:{address[0]}:{address[1]}')
+            print(f'\n[*] Connected to: {client_id}')
             increaseThreadCount()
             print(f'Total clients connected: {ThreadCount}')
-            i += 1
+            # i += 1
         
         return ServerSocket
         # self.keepRunning = False
@@ -99,14 +104,14 @@ class AcceptClients(Thread):
     #     self.keepRunning = False
 
 
-if __name__ == "__main__":
+def main(server_pipe_endpoints):
     num_epochs = 10
     HOST = 'localhost'
     PORT = 8000
-    limit_clients = 2
+    limit_clients = 1
     accept_clients = AcceptClients(HOST, PORT, limit_clients)
     # accept_clients.start()
-    ServerSocket = accept_clients.run()
+    ServerSocket = accept_clients.run(server_pipe_endpoints)
     # time.sleep(10)
     # accept_clients.stop()
 
@@ -131,16 +136,25 @@ if __name__ == "__main__":
             print(f'\nEpoch: {epoch+1}')
             for _, client in connected_clients.items():
                 executor.submit(client.get_remote_activations1())
-
+            
+            print('Server side: Here1')
             for _, client in connected_clients.items():
-                executor.submit(client.forward_center())
+                print(client.remote_activations1)
+            
+            connected_clients['wnfo'].forward_center()
+            
+            print('Server side: Here2')
             
             for _, client in connected_clients.items():
                 executor.submit(client.send_remote_activations2())
             
+            print('Server side: Here3')
+            
             for _, client in connected_clients.items():
                 executor.submit(client.get_remote_activations2_grads())
-
+            
+            print('Server side: Here4')
+            
             for _, client in connected_clients.items():
                 client.center_optimizer.zero_grad()
                 executor.submit(client.backward_center())
@@ -168,4 +182,6 @@ if __name__ == "__main__":
                 
     ServerSocket.close()
 
-        
+
+if __name__ == "__main__":
+    main(None)
