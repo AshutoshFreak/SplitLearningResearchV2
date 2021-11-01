@@ -73,6 +73,7 @@ def test(model, device, test_loader):
 
 
 if __name__ == "__main__":
+    torch.multiprocessing.set_start_method('spawn')
     num_clients = 1
     num_epochs = 10
 
@@ -133,7 +134,6 @@ if __name__ == "__main__":
         p = multiprocessing.Process(target=server.main, args=(server_pipe_endpoints,))
         p.start()
         
-        # print('Hello')
 
         # all clients get model from the server
         print('Getting model from server...', end='')
@@ -164,7 +164,6 @@ if __name__ == "__main__":
             end = time.time()
             time_taken['forward_front'] += end-start
 
-            print('Client side: Here1')
 
             start = time.time()
             # send activations to the server
@@ -173,9 +172,6 @@ if __name__ == "__main__":
             end = time.time()
             time_taken['send_remote_activations1'] += end-start
 
-            for _, client in clients.items():
-                print(client.remote_activations1)
-            print('Client side: Here2')
 
             start = time.time()
             for _, client in clients.items():
@@ -183,7 +179,6 @@ if __name__ == "__main__":
             end = time.time()
             time_taken['get_remote_activations2'] += end-start
 
-            print('Client side: Here3')
 
             start = time.time()
             for _, client in clients.items():
@@ -191,7 +186,6 @@ if __name__ == "__main__":
             end = time.time()
             time_taken['forward_back'] += end-start
 
-            print('Client side: Here4')
 
             start = time.time()
             for _, client in clients.items():
@@ -199,7 +193,6 @@ if __name__ == "__main__":
             end = time.time()
             time_taken['calculate_loss'] += end-start
 
-            print('Client side: Here5')
 
             start = time.time()
             for _, client in clients.items():
@@ -264,7 +257,6 @@ if __name__ == "__main__":
         # call forward prop for each client
         for _, client in clients.items():
             executor.submit(client.forward_front())
-        print('Here')
         # send activations to the server
         for _, client in clients.items():
             executor.submit(client.send_remote_activations1())
@@ -301,26 +293,3 @@ if __name__ == "__main__":
     print('Test accuracy for each client:')
     for client_id, client in clients.items():
             print(f'{client_id}:{client.test_acc}')
-
-
-    # # Visualising the data with labels
-    # examples = iter(clients[client_id].test_DataLoader)
-    # example_data, example_targets = examples.next()
-    # print(example_data.shape, example_targets.shape)
-
-    # for i in range(6):
-    #     plt.subplot(1,6,i+1)
-    #     plt.title(example_targets[i].item())
-    #     plt.imshow(example_data[i][0])
-    # plt.show()
-
-
-    # for client_id in clients:
-    #     client = clients[client_id]
-    #     print('Getting model from server...', end='')
-    #     client.getModel()
-    #     time.sleep(5)
-    #     print('Done')
-    #     print(client.front_model)
-        # client.getFrontModel()
-        # client.getBackModel()

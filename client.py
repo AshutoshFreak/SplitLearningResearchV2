@@ -15,16 +15,11 @@ import struct
 # pylint: disable=missing-function-docstring
 # pylint: disable=missing-class-docstring
 
-# class SeverProtocol:
 
 
 class Client(Thread):
-    # def __init__(self, id, loop_time=1/60, *args, **kwargs):
     def __init__(self, id, *args, **kwargs):
         super(Client, self).__init__(*args, **kwargs)
-        # self.q = queue.Queue()
-        # self.timeout = loop_time
-        # Thread.__init__(self)
         self.id = id
         self.front_model = []
         self.back_model = []
@@ -51,8 +46,8 @@ class Client(Thread):
         self.back_optimizer = None
         self.train_acc = []
         self.test_acc = []
-        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.device = torch.device('cpu')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # self.device = torch.device('cpu')
         
 
     def forward_front(self):
@@ -110,21 +105,6 @@ class Client(Thread):
         self.front_optimizer.step()
         self.back_optimizer.step()
 
-    # def forward_front():
-    #     pass
-    
-
-    # def forward_back():
-    #     pass
-
-    
-    # def backward_front():
-    #     pass
-
-
-    # def backward_back():
-    #     pass
-
 
     # def onThread(self, function, *args, **kwargs):
     #     self.q.put((function, args, kwargs))
@@ -172,19 +152,8 @@ class Client(Thread):
 
 
     def connect_server(self, host='localhost', port=8000, BUFFER_SIZE=4096):
-        # self.socket = socket.socket()
         self.socket, self.server_socket = multiprocessing.Pipe()
         print(f"[*] Client {self.id} connecting to {host}")
-        # print(f"[*] Client {self.id} connecting to {host}:{port}")
-        # try:
-        #     self.socket.connect((host, port))
-        #     print(f'[*] Client {self.id} connected! {self.id} address: {self.socket.getsockname()[0]}:{self.socket.getsockname()[1]}\n')
-        #     self.socket.sendall(str.encode(self.id))
-        #     return True
-
-        # except socket.error as e:
-        #     print(f'[*] Client {self.id} failed to connect to the server.\n{e}')
-        #     return False
 
 
     def disconnect_server(self) -> bool:

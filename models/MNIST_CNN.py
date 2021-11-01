@@ -28,9 +28,7 @@ class center(nn.Module):
         self.fc1 = nn.Linear(9216, 128)
 
     def forward(self, x):
-        print('in center forward')
         x = self.conv2(x)
-        print('done conv2')
         x = F.relu(x)
         x = F.max_pool2d(x, 2)
         x = self.dropout1(x)
