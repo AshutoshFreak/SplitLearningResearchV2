@@ -81,8 +81,8 @@ if __name__ == "__main__":
 
     dataset = 'MNIST'
     print(f'Using dataset: {dataset}')
-    train_batch_size = 1
-    test_batch_size = 1
+    train_batch_size = 128
+    test_batch_size = 128
 
     time_taken = {'forward_front':0,
                     'send_remote_activations1':0,
@@ -257,6 +257,7 @@ if __name__ == "__main__":
         # call forward prop for each client
         for _, client in clients.items():
             executor.submit(client.forward_front())
+
         # send activations to the server
         for _, client in clients.items():
             executor.submit(client.send_remote_activations1())
