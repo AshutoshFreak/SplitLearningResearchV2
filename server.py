@@ -92,7 +92,7 @@ def main(server_pipe_endpoints):
     num_epochs = 10
     HOST = 'localhost'
     PORT = 8000
-    limit_clients = 1
+    limit_clients = 2
     accept_clients = AcceptClients(HOST, PORT, limit_clients)
     # accept_clients.start()
     ServerSocket = accept_clients.run(server_pipe_endpoints)

@@ -74,7 +74,7 @@ def test(model, device, test_loader):
 
 if __name__ == "__main__":
     torch.multiprocessing.set_start_method('spawn')
-    num_clients = 1
+    num_clients = 2
     num_epochs = 10
 
     server_pipe_endpoints = {}
