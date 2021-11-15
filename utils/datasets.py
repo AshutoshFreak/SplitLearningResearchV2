@@ -2,8 +2,12 @@ import torch
 import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from torchvision import models
+from tqdm.notebook import tqdm
+import glob
+import os
+from PIL import Image
 
 # source: https://www.kaggle.com/saranga7/1000fundus-pytorch-transferlearning
 class custom_1000Fundus(Dataset):
@@ -25,7 +29,7 @@ class custom_1000Fundus(Dataset):
         return len(self.data)
 
 
-    def __getitem__(self,idx):
+    def __getitem__(self, idx):
         img_path,class_name = self.data[idx]
         img = Image.open(img_path)
         class_id = self.class_map[class_name]
@@ -71,20 +75,23 @@ def get_mean_std(loader):
     return mean, std
 
 
-def Fundus1000(path, root_dir, split=0.8):
+def Fundus1000(root_dir, split=0.8):
     my_transforms = create_transforms(normalize=False)
-    dataset = custom_dataset(root_dir, my_transforms)
-    train_set, val_set = torch.utils.data.random_split(dataset, [split*len(dataset), (1-split)*len(dataset)], generator=torch.Generator().manual_seed(7))
-    train_loader = DataLoader(train_set,batch_size=BS, shuffle=True)
+    dataset = custom_1000Fundus(root_dir, my_transforms)
+    train_set, val_set = torch.utils.data.random_split(dataset, [800, 200], generator=torch.Generator().manual_seed(7))
+    # train_set, val_set = torch.utils.data.random_split(dataset, [split*len(dataset), (1-split)*len(dataset)])
+    BS = 8
+    train_loader = DataLoader(train_set, batch_size=BS, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=BS, shuffle=True)
     mean, std = get_mean_std(train_loader)
 
     print(mean, std)
 
     my_transforms = create_transforms(normalize=True, mean=mean,std = std)
-    dataset = custom_dataset(root_dir, my_transforms)
+    dataset = custom_1000Fundus(root_dir, my_transforms)
     print(len(dataset))
-    train_set, val_set = torch.utils.data.random_split(dataset, [split*len(dataset), (1-split)*len(dataset)], generator=torch.Generator().manual_seed(7))
+    train_set, val_set = torch.utils.data.random_split(dataset, [800, 200], generator=torch.Generator().manual_seed(7))
+    # train_set, val_set = torch.utils.data.random_split(dataset, [split*len(dataset), (1-split)*len(dataset)])
     return train_set, val_set
 
 
@@ -125,7 +132,8 @@ def load_full_dataset(dataset, dataset_path):
     if dataset == 'CIFAR10':
         return CIFAR10(dataset_path)
     
-    if dataset = '1000Fundus':
+    if dataset == '1000Fundus':
+        dataset_path = os.path.join(dataset_path, '1000Fundus/1000images/1000images')
         return Fundus1000(dataset_path)
     return train_dataset, test_dataset
 

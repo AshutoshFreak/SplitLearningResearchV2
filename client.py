@@ -50,14 +50,15 @@ class Client(Thread):
         # self.device = torch.device('cpu')
         
 
-    def forward_front(self):
+    def forward_front(self, transferlearning=False):
         self.data, self.targets = next(self.iterator)
         # self.data = self.data.reshape(-1, 784).to(self.device)
         self.data, self.targets = self.data.to(self.device), self.targets.to(self.device)
 
         self.activations1 = self.front_model(self.data)
-        self.remote_activations1 = self.activations1.detach().requires_grad_(True)
-
+        self.remote_activations1 = self.activations1.detach()
+        if not transferlearning:
+            self.remote_activations1.requires_grad_(True)
 
 
     def forward_back(self):

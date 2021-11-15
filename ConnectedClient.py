@@ -62,9 +62,11 @@ class ConnectedClient(object):
     #         except queue.Empty:
     #             self.idle()
 
-    def forward_center(self):
+    def forward_center(self, transferlearning=False):
         self.activations2 = self.center_model(self.remote_activations1)
-        self.remote_activations2 = self.activations2.detach().requires_grad_(True)
+        self.remote_activations2 = self.activations2.detach()
+        if not transferlearning:
+            self.remote_activations1.requires_grad_(True)
 
 
     def backward_center(self):

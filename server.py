@@ -1,3 +1,4 @@
+
 import socket
 from _thread import start_new_thread
 from threading import Thread
@@ -7,7 +8,7 @@ import time
 import pickle
 import torch
 import random
-from models import MNIST_CNN
+from models import Fundus1000 as model
 from concurrent.futures import ThreadPoolExecutor
 from utils.merge_grads import merge_grads
 import torch.optim as optim
@@ -103,12 +104,13 @@ def main(server_pipe_endpoints):
 
     for client_id in connected_clients:
         client = connected_clients[client_id]
-        client.front_model = MNIST_CNN.front()
-        client.back_model = MNIST_CNN.back()
-        client.center_model = MNIST_CNN.center().to(client.device)
-        client.train_fun = MNIST_CNN.train
-        client.test_fun = MNIST_CNN.test
-        client.center_optimizer = optim.Adadelta(client.center_model.parameters(), lr=1)
+        client.front_model = model.front()
+        client.back_model = model.back()
+        client.center_model = model.center().to(client.device)
+        print(client.center_model)
+        # client.train_fun = model.train
+        # client.test_fun = model.test
+        client.center_optimizer = optim.AdamW(client.center_model.parameters(), lr=1e-3)
 
 
     with ThreadPoolExecutor() as executor:
@@ -123,7 +125,7 @@ def main(server_pipe_endpoints):
 
 
             for _, client in connected_clients.items():
-                executor.submit(client.forward_center())
+                executor.submit(client.forward_center(transferlearning=True))
 
 
             for _, client in connected_clients.items():
@@ -154,7 +156,7 @@ def main(server_pipe_endpoints):
             executor.submit(client.get_remote_activations1())
 
         for _, client in connected_clients.items():
-            executor.submit(client.forward_center())
+            executor.submit(client.forward_center(transferlearning=True))
 
         for _, client in connected_clients.items():
             executor.submit(client.send_remote_activations2())

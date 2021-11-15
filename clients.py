@@ -2,7 +2,6 @@ import os
 import random
 import string
 import socket
-import tqdm
 import requests
 import sys
 import threading
@@ -19,7 +18,7 @@ import multiprocessing
 
 
 # should get optimizers from the server instead of initializing here
-# will do it later
+# will do later
 import torch.optim as optim
 
 
@@ -28,7 +27,7 @@ random.seed(SEED)
 torch.manual_seed(SEED)
 
 
-def initialize_client(client, dataset, train_batch_size, test_batch_size, tranform=None):
+def initialize_client(client, dataset, train_batch_size, test_batch_size, transform=None):
     client.load_data(dataset, transform)
     print(f'Length of train dataset client {client.id}: {len(client.train_dataset)}')
     client.create_DataLoader(train_batch_size, test_batch_size)
@@ -43,8 +42,8 @@ if __name__ == "__main__":
 
     dataset = '1000Fundus'
     print(f'Using dataset: {dataset}')
-    train_batch_size = 128
-    test_batch_size = 128
+    train_batch_size = 8
+    test_batch_size = 8
 
     time_taken = {'forward_front':0,
                     'send_remote_activations1':0,
@@ -102,6 +101,7 @@ if __name__ == "__main__":
 
         for _, client in clients.items():
             print(client.front_model)
+            print(client.back_model)
 
         for _, client in clients.items():
             client.front_model.to(client.device)
@@ -119,7 +119,7 @@ if __name__ == "__main__":
             start = time.time()
             # call forward prop for each client         
             for _, client in clients.items():
-                executor.submit(client.forward_front())
+                executor.submit(client.forward_front(transferlearning=True))
             end = time.time()
             time_taken['forward_front'] += end-start
 
