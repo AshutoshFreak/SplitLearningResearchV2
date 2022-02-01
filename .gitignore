@@ -137,4 +137,7 @@ data/
 # git graph
 .gitGraph/
 
+# VS Code
+.vscode/
+
 
