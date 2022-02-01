@@ -12,6 +12,10 @@ from concurrent.futures import ThreadPoolExecutor
 from utils.merge_grads import merge_grads
 import torch.optim as optim
 import multiprocessing
+from opacus.accountants import RDPAccountant
+from opacus import GradSampleModule
+from opacus.optimizers import DPOptimizer
+from opacus.validators import ModuleValidator
 # import requests
 
 SEED = 2646
@@ -89,7 +93,9 @@ class AcceptClients(Thread):
 
 
 def main(server_pipe_endpoints):
-    num_epochs = 10
+    num_epochs = 200
+    train_batch_size = 128
+    test_batch_size = 128
     HOST = 'localhost'
     PORT = 8000
     limit_clients = 2
@@ -105,10 +111,41 @@ def main(server_pipe_endpoints):
         client = connected_clients[client_id]
         client.front_model = MNIST_CNN.front()
         client.back_model = MNIST_CNN.back()
-        client.center_model = MNIST_CNN.center().to(client.device)
+        client.center_model = MNIST_CNN.center()
         client.train_fun = MNIST_CNN.train
         client.test_fun = MNIST_CNN.test
+
+    
+    for client_id in connected_clients:
+        client = connected_clients[client_id]
+
+        # Attaching PrivacyEngine to center model
+        # initialize privacy accountant
+        client.center_accountant = RDPAccountant()
+
+        # wrap model
+        # client.center_model = ModuleValidator.fix(client.center_model)
+        client.center_model = GradSampleModule(client.center_model)
+        client.center_model.to(client.device)
+    
+        # initialize optimizer
         client.center_optimizer = optim.Adadelta(client.center_model.parameters(), lr=1)
+        
+        # wrap optimizer
+        client.center_optimizer = DPOptimizer(
+            optimizer=client.center_optimizer,
+            noise_multiplier=1.3, # same as make_private arguments
+            max_grad_norm=1.0, # same as make_private arguments
+            expected_batch_size=train_batch_size # if you're averaging your gradients, you need to know the denominator
+        )
+
+        # attach accountant to track privacy for an optimizer
+        client.center_optimizer.attach_step_hook(
+            client.center_accountant.get_optimizer_hook_fn(
+            # this is an important parameter for privacy accounting. Should be equal to batch_size / len(dataset)
+            sample_rate=train_batch_size/60000
+            )
+        )
 
 
     with ThreadPoolExecutor() as executor:
@@ -132,10 +169,6 @@ def main(server_pipe_endpoints):
 
             for _, client in connected_clients.items():
                 executor.submit(client.get_remote_activations2_grads())
-
-
-            for _, client in connected_clients.items():
-                client.center_optimizer.zero_grad()
                 executor.submit(client.backward_center())
 
             for _, client in connected_clients.items():
@@ -146,18 +179,24 @@ def main(server_pipe_endpoints):
                 params.append(client.center_model.parameters())
             merge_grads(params)
 
+
             for _, client in connected_clients.items():
                 client.center_optimizer.step()
 
-        # Testing
-        for _, client in connected_clients.items():
-            executor.submit(client.get_remote_activations1())
 
-        for _, client in connected_clients.items():
-            executor.submit(client.forward_center())
+            for _, client in connected_clients.items():
+                client.center_optimizer.zero_grad()
+                
 
-        for _, client in connected_clients.items():
-            executor.submit(client.send_remote_activations2())
+        # # Testing
+        # for _, client in connected_clients.items():
+        #     executor.submit(client.get_remote_activations1())
+
+        # for _, client in connected_clients.items():
+        #     executor.submit(client.forward_center())
+
+        # for _, client in connected_clients.items():
+        #     executor.submit(client.send_remote_activations2())
 
 
 

@@ -16,6 +16,11 @@ import matplotlib.pyplot as plt
 import time
 import server
 import multiprocessing
+from opacus import PrivacyEngine
+from opacus.accountants import RDPAccountant
+from opacus import GradSampleModule
+from opacus.optimizers import DPOptimizer
+from opacus.validators import ModuleValidator
 
 
 # should get optimizers from the server instead of initializing here
@@ -34,48 +39,10 @@ def initialize_client(client, dataset, train_batch_size, test_batch_size, tranfo
     client.create_DataLoader(train_batch_size, test_batch_size)
 
 
-# unused
-def train(args, model, device, train_loader, optimizer, epoch):
-    model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output, target)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item()))
-            if args.dry_run:
-                break
-
-
-# unused
-def test(model, device, test_loader):
-    model.eval()
-    test_loss = 0
-    correct = 0
-    with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
-            pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-            correct += pred.eq(target.view_as(pred)).sum().item()
-
-    test_loss /= len(test_loader.dataset)
-
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
-
-
 if __name__ == "__main__":
     torch.multiprocessing.set_start_method('spawn')
     num_clients = 2
-    num_epochs = 10
+    num_epochs = 200
 
     server_pipe_endpoints = {}
 
@@ -147,9 +114,50 @@ if __name__ == "__main__":
         for _, client in clients.items():
             client.front_model.to(client.device)
             client.back_model.to(client.device)
-            client.front_optimizer = optim.Adadelta(client.front_model.parameters(), lr=0.1)
-            client.back_optimizer = optim.Adadelta(client.back_model.parameters(), lr=0.1)
             client.iterator = iter(client.train_DataLoader)
+
+
+        for _, client in clients.items():
+            # attaching PrivacyEngine to front model
+            client.front_privacy_engine = PrivacyEngine()
+            # client.front_model = ModuleValidator.fix(client.front_model)
+            client.front_optimizer = optim.Adadelta(client.front_model.parameters(), lr=0.1)
+            client.front_model, client.front_optimizer, client.train_DataLoader = \
+                client.front_privacy_engine.make_private(
+                module=client.front_model,
+                data_loader=client.train_DataLoader,
+                noise_multiplier=1.3,
+                max_grad_norm=1.0,
+                optimizer=client.front_optimizer,
+            )
+
+
+            # Attaching PrivacyEngine to back model
+            # initialize privacy accountant
+            client.back_accountant = RDPAccountant()
+
+            # wrap model
+            # client.back_model = ModuleValidator.fix(client.back_model)
+            client.back_model = GradSampleModule(client.back_model)
+
+            # initialize back optimizer
+            client.back_optimizer = optim.Adadelta(client.back_model.parameters(), lr=0.1)
+
+            # wrap optimizer
+            client.back_optimizer = DPOptimizer(
+                optimizer=client.back_optimizer,
+                noise_multiplier=1.3, # same as make_private arguments
+                max_grad_norm=1.0, # same as make_private arguments
+                expected_batch_size=train_batch_size # if you're averaging your gradients, you need to know the denominator
+            )
+
+            # attach accountant to track privacy for an optimizer
+            client.back_optimizer.attach_step_hook(
+                client.back_accountant.get_optimizer_hook_fn(
+                # this is an important parameter for privacy accounting. Should be equal to batch_size / len(dataset)
+                sample_rate=train_batch_size/60000
+                )
+            )
 
 
         # Training
@@ -203,12 +211,6 @@ if __name__ == "__main__":
 
             start = time.time()
             for _, client in clients.items():
-                executor.submit(client.zero_grad())
-            end = time.time()
-            time_taken['zero_grad'] += end-start
-
-            start = time.time()
-            for _, client in clients.items():
                 executor.submit(client.backward_back())
             end = time.time()
             time_taken['backward_back'] += end-start
@@ -242,6 +244,13 @@ if __name__ == "__main__":
             time_taken['step'] += end-start
 
 
+            start = time.time()
+            for _, client in clients.items():
+                executor.submit(client.zero_grad())
+            end = time.time()
+            time_taken['zero_grad'] += end-start
+
+
             train_acc = 0
             for _, client in clients.items():
                 train_acc += client.train_acc[-1]
@@ -249,30 +258,30 @@ if __name__ == "__main__":
             overall_acc.append(train_acc)
 
 
-        # Testing
-        # Setting up iterator for testing
-        for _, client in clients.items():
-            client.iterator = iter(client.test_DataLoader)
+        # # Testing
+        # # Setting up iterator for testing
+        # for _, client in clients.items():
+        #     client.iterator = iter(client.test_DataLoader)
 
-        # call forward prop for each client
-        for _, client in clients.items():
-            executor.submit(client.forward_front())
+        # # call forward prop for each client
+        # for _, client in clients.items():
+        #     executor.submit(client.forward_front())
 
-        # send activations to the server
-        for _, client in clients.items():
-            executor.submit(client.send_remote_activations1())
+        # # send activations to the server
+        # for _, client in clients.items():
+        #     executor.submit(client.send_remote_activations1())
 
-        for _, client in clients.items():
-            executor.submit(client.get_remote_activations2())
+        # for _, client in clients.items():
+        #     executor.submit(client.get_remote_activations2())
 
-        for _, client in clients.items():
-            executor.submit(client.forward_back())
+        # for _, client in clients.items():
+        #     executor.submit(client.forward_back())
 
-        for _, client in clients.items():
-            executor.submit(client.calculate_loss())
+        # for _, client in clients.items():
+        #     executor.submit(client.calculate_loss())
 
-        for _, client in clients.items():
-            executor.submit(client.calculate_test_acc())
+        # for _, client in clients.items():
+        #     executor.submit(client.calculate_test_acc())
 
 
     print('\n')
