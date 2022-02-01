@@ -91,12 +91,14 @@ class AcceptClients(Thread):
 
 def main(server_pipe_endpoints):
     num_epochs = 10
+    num_iters = 50
+    num_epochs = num_epochs*num_iters
     HOST = 'localhost'
     PORT = 8000
     limit_clients = 1
     accept_clients = AcceptClients(HOST, PORT, limit_clients)
     # accept_clients.start()
-    ServerSocket = accept_clients.run(server_pipe_endpoints)
+    accept_clients.run(server_pipe_endpoints)
     # time.sleep(10)
     # accept_clients.stop()
 
@@ -119,47 +121,48 @@ def main(server_pipe_endpoints):
         
         # Training
         for epoch in range(num_epochs):
-            print(f'\nEpoch: {epoch+1}')
+            print(f'Iter: {epoch+1}')
             for _, client in connected_clients.items():
                 executor.submit(client.get_remote_activations1())
 
 
             for _, client in connected_clients.items():
                 executor.submit(client.forward_center(transferlearning=True))
+                # executor.submit(client.forward_center())
 
 
             for _, client in connected_clients.items():
                 executor.submit(client.send_remote_activations2())
 
 
-            for _, client in connected_clients.items():
-                executor.submit(client.get_remote_activations2_grads())
+            # for _, client in connected_clients.items():
+            #     executor.submit(client.get_remote_activations2_grads())
 
 
-            for _, client in connected_clients.items():
-                client.center_optimizer.zero_grad()
-                executor.submit(client.backward_center())
+            # for _, client in connected_clients.items():
+            #     client.center_optimizer.zero_grad()
+            #     executor.submit(client.backward_center())
 
-            for _, client in connected_clients.items():
-                executor.submit(client.send_remote_activations1_grads())
+            # for _, client in connected_clients.items():
+            #     executor.submit(client.send_remote_activations1_grads())
 
-            params = []
-            for _, client in connected_clients.items():
-                params.append(client.center_model.parameters())
-            merge_grads(params)
+            # params = []
+            # for _, client in connected_clients.items():
+            #     params.append(client.center_model.parameters())
+            # merge_grads(params)
 
-            for _, client in connected_clients.items():
-                client.center_optimizer.step()
+            # for _, client in connected_clients.items():
+            #     client.center_optimizer.step()
 
-        # Testing
-        for _, client in connected_clients.items():
-            executor.submit(client.get_remote_activations1())
+        # # Testing
+        # for _, client in connected_clients.items():
+        #     executor.submit(client.get_remote_activations1())
 
-        for _, client in connected_clients.items():
-            executor.submit(client.forward_center(transferlearning=True))
+        # for _, client in connected_clients.items():
+        #     executor.submit(client.forward_center(transferlearning=True))
 
-        for _, client in connected_clients.items():
-            executor.submit(client.send_remote_activations2())
+        # for _, client in connected_clients.items():
+        #     executor.submit(client.send_remote_activations2())
 
 
 

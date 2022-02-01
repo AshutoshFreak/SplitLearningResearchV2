@@ -35,7 +35,7 @@ def initialize_client(client, dataset, train_batch_size, test_batch_size, transf
 
 if __name__ == "__main__":
     torch.multiprocessing.set_start_method('spawn')
-    num_clients = 1
+    num_clients = 2
     num_epochs = 10
 
     server_pipe_endpoints = {}
@@ -106,99 +106,82 @@ if __name__ == "__main__":
         for _, client in clients.items():
             client.front_model.to(client.device)
             client.back_model.to(client.device)
-            client.front_optimizer = optim.Adadelta(client.front_model.parameters(), lr=0.1)
-            client.back_optimizer = optim.Adadelta(client.back_model.parameters(), lr=0.1)
-            client.iterator = iter(client.train_DataLoader)
+            # client.front_optimizer = optim.Adadelta(client.front_model.parameters(), lr=0.1)
+            client.back_optimizer = optim.AdamW(client.back_model.parameters(), lr=1e-3)
+            client.scheduler = optim.lr_scheduler.StepLR(client.back_optimizer, step_size=2, gamma=0.9,verbose=True)
 
 
         # Training
+        num_iters = 50
         for epoch in range(num_epochs):
-            print(f'\nEpoch: {epoch+1}:')
-
-
-            start = time.time()
-            # call forward prop for each client         
             for _, client in clients.items():
-                executor.submit(client.forward_front(transferlearning=True))
-            end = time.time()
-            time_taken['forward_front'] += end-start
+                client.iterator = iter(client.train_DataLoader)
+            
+            print(f"Epoch: {epoch}")
+            
+            for iter_num in range(num_iters):
+                print(f'Epoch: {epoch}, Iter: {iter_num+1}:')
+
+                # call forward prop for each client         
+                for _, client in clients.items():
+                    executor.submit(client.forward_front(transferlearning=True))
 
 
-            start = time.time()
-            # send activations to the server
+                # send activations to the server
+                for _, client in clients.items():
+                    executor.submit(client.send_remote_activations1())
+
+
+                for _, client in clients.items():
+                    executor.submit(client.get_remote_activations2())
+
+
+                for _, client in clients.items():
+                    executor.submit(client.forward_back())
+
+
+                for _, client in clients.items():
+                    executor.submit(client.calculate_loss())
+
+
+                for _, client in clients.items():
+                    executor.submit(client.calculate_train_acc())
+
+
+                for _, client in clients.items():
+                    executor.submit(client.zero_grad())
+
+
+                for _, client in clients.items():
+                    executor.submit(client.backward_back())
+
+
+                # start = time.time()
+                # for _, client in clients.items():
+                #     executor.submit(client.send_remote_activations2_grads())
+                # end = time.time()
+                # time_taken['send_remote_activations2_grads'] += end-start
+
+
+                # start = time.time()
+                # for _, client in clients.items():
+                #     executor.submit(client.get_remote_activations1_grads())
+                # end = time.time()
+                # time_taken['get_remote_activations1_grads'] += end-start
+
+
+                # start = time.time()
+                # for _, client in clients.items():
+                #     executor.submit(client.backward_front())
+                # end = time.time()
+                # time_taken['backward_front'] += end-start
+
+
+                for _, client in clients.items():
+                    executor.submit(client.step())
+            
             for _, client in clients.items():
-                executor.submit(client.send_remote_activations1())
-            end = time.time()
-            time_taken['send_remote_activations1'] += end-start
-
-
-            start = time.time()
-            for _, client in clients.items():
-                executor.submit(client.get_remote_activations2())
-            end = time.time()
-            time_taken['get_remote_activations2'] += end-start
-
-
-            start = time.time()
-            for _, client in clients.items():
-                executor.submit(client.forward_back())
-            end = time.time()
-            time_taken['forward_back'] += end-start
-
-
-            start = time.time()
-            for _, client in clients.items():
-                executor.submit(client.calculate_loss())
-            end = time.time()
-            time_taken['calculate_loss'] += end-start
-
-
-            start = time.time()
-            for _, client in clients.items():
-                executor.submit(client.calculate_train_acc())
-            end = time.time()
-            time_taken['calculate_train_acc'] += end-start
-
-
-            start = time.time()
-            for _, client in clients.items():
-                executor.submit(client.zero_grad())
-            end = time.time()
-            time_taken['zero_grad'] += end-start
-
-            start = time.time()
-            for _, client in clients.items():
-                executor.submit(client.backward_back())
-            end = time.time()
-            time_taken['backward_back'] += end-start
-
-
-            start = time.time()
-            for _, client in clients.items():
-                executor.submit(client.send_remote_activations2_grads())
-            end = time.time()
-            time_taken['send_remote_activations2_grads'] += end-start
-
-
-            start = time.time()
-            for _, client in clients.items():
-                executor.submit(client.get_remote_activations1_grads())
-            end = time.time()
-            time_taken['get_remote_activations1_grads'] += end-start
-
-
-            start = time.time()
-            for _, client in clients.items():
-                executor.submit(client.backward_front())
-            end = time.time()
-            time_taken['backward_front'] += end-start
-
-
-            start = time.time()
-            for _, client in clients.items():
-                executor.submit(client.step())
-            end = time.time()
-            time_taken['step'] += end-start
+                client.scheduler.step()
 
 
             train_acc = 0
@@ -208,35 +191,30 @@ if __name__ == "__main__":
             overall_acc.append(train_acc)
 
 
-        # Testing
-        # Setting up iterator for testing
-        for _, client in clients.items():
-            client.iterator = iter(client.test_DataLoader)
+        # # Testing
+        # # Setting up iterator for testing
+        # for _, client in clients.items():
+        #     client.iterator = iter(client.test_DataLoader)
 
-        # call forward prop for each client
-        for _, client in clients.items():
-            executor.submit(client.forward_front())
+        # # call forward prop for each client
+        # for _, client in clients.items():
+        #     executor.submit(client.forward_front())
 
-        # send activations to the server
-        for _, client in clients.items():
-            executor.submit(client.send_remote_activations1())
+        # # send activations to the server
+        # for _, client in clients.items():
+        #     executor.submit(client.send_remote_activations1())
 
-        for _, client in clients.items():
-            executor.submit(client.get_remote_activations2())
+        # for _, client in clients.items():
+        #     executor.submit(client.get_remote_activations2())
 
-        for _, client in clients.items():
-            executor.submit(client.forward_back())
+        # for _, client in clients.items():
+        #     executor.submit(client.forward_back())
 
-        for _, client in clients.items():
-            executor.submit(client.calculate_loss())
+        # for _, client in clients.items():
+        #     executor.submit(client.calculate_loss())
 
-        for _, client in clients.items():
-            executor.submit(client.calculate_test_acc())
-
-
-    print('\n')
-    for func in time_taken:
-        print(f'{func}: {(time_taken[func]/num_epochs):3f}')
+            # for _, client in clients.items():
+            #     executor.submit(client.calculate_test_acc())
 
 
     for client_id, client in clients.items():

@@ -62,6 +62,7 @@ class Client(Thread):
 
 
     def forward_back(self):
+        # print(self.remote_activations2.shape)
         self.outputs = self.back_model(self.remote_activations2)
 
 
@@ -85,7 +86,7 @@ class Client(Thread):
             self.n_correct = (self.predicted == self.targets).sum().item()
             self.n_samples = self.targets.size(0)
             self.train_acc.append(100.0 * self.n_correct/self.n_samples)
-            print(f'Acc: {self.train_acc[-1]}')
+            print(f'Train Acc: {self.train_acc[-1]}')
 
 
     def calculate_test_acc(self):
@@ -94,16 +95,16 @@ class Client(Thread):
             self.n_correct = (self.predicted == self.targets).sum().item()
             self.n_samples = self.targets.size(0)
             self.test_acc.append(100.0 * self.n_correct/self.n_samples)
-            print(f'Acc: {self.test_acc[-1]}')
+            print(f'Test Acc: {self.test_acc[-1]}')
 
 
     def zero_grad(self):
-        self.front_optimizer.zero_grad()
+        # self.front_optimizer.zero_grad()
         self.back_optimizer.zero_grad()
 
 
     def step(self):
-        self.front_optimizer.step()
+        # self.front_optimizer.step()
         self.back_optimizer.step()
 
 

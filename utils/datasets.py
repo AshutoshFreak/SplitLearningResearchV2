@@ -126,6 +126,7 @@ def CIFAR10(path):
 
 
 def load_full_dataset(dataset, dataset_path):
+    train_dataset, test_dataset = torch.tensor([0]), torch.tensor([0])
     if dataset == 'MNIST':
         return MNIST(dataset_path)
 

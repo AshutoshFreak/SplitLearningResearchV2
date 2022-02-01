@@ -1,5 +1,6 @@
 import torchvision
 import torch.nn as nn
+import torch
 
 vgg_model = torchvision.models.vgg16(pretrained=True)
 num_classes = 39
@@ -42,10 +43,12 @@ class center(nn.Module):
         super(center, self).__init__()
         self.center_m = vgg_model.features[7:]
         self.avgpool = vgg_model.avgpool
+        self.flatten = torch.flatten
 
     def forward(self, x):
         x = self.center_m(x)
         x = self.avgpool(x)
+        x = self.flatten(x, start_dim=1)
         return x
 
 
