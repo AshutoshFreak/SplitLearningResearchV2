@@ -41,8 +41,10 @@ def initialize_client(client, dataset, train_batch_size, test_batch_size, tranfo
 
 if __name__ == "__main__":
     torch.multiprocessing.set_start_method('spawn')
-    num_clients = 2
+    num_clients = 1
     num_epochs = 200
+    noise_multiplier = 1.0
+    delta = 1.6e-5
 
     server_pipe_endpoints = {}
 
@@ -126,7 +128,7 @@ if __name__ == "__main__":
                 client.front_privacy_engine.make_private(
                 module=client.front_model,
                 data_loader=client.train_DataLoader,
-                noise_multiplier=1.3,
+                noise_multiplier=noise_multiplier,
                 max_grad_norm=1.0,
                 optimizer=client.front_optimizer,
             )
@@ -146,7 +148,7 @@ if __name__ == "__main__":
             # wrap optimizer
             client.back_optimizer = DPOptimizer(
                 optimizer=client.back_optimizer,
-                noise_multiplier=1.3, # same as make_private arguments
+                noise_multiplier=noise_multiplier, # same as make_private arguments
                 max_grad_norm=1.0, # same as make_private arguments
                 expected_batch_size=train_batch_size # if you're averaging your gradients, you need to know the denominator
             )
@@ -256,6 +258,13 @@ if __name__ == "__main__":
                 train_acc += client.train_acc[-1]
             train_acc = train_acc/num_clients
             overall_acc.append(train_acc)
+
+            
+            for _, client in clients.items():
+                front_epsilon, front_best_alpha = client.front_privacy_engine.accountant.get_privacy_spent(delta=delta)
+                back_epsilon, back_best_alpha = client.back_accountant.get_privacy_spent(delta=delta)
+                print(f"([{client.id}] ε = {front_epsilon:.2f}, δ = {delta}) for α = {front_best_alpha}")
+                print(f"([{client.id}] ε = {back_epsilon:.2f}, δ = {delta}) for α = {back_best_alpha}")
 
 
         # # Testing

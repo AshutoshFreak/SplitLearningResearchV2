@@ -98,7 +98,9 @@ def main(server_pipe_endpoints):
     test_batch_size = 128
     HOST = 'localhost'
     PORT = 8000
-    limit_clients = 2
+    limit_clients = 1
+    noise_multiplier = 1.0
+    delta = 1.6e-5
     accept_clients = AcceptClients(HOST, PORT, limit_clients)
     # accept_clients.start()
     ServerSocket = accept_clients.run(server_pipe_endpoints)
@@ -134,7 +136,7 @@ def main(server_pipe_endpoints):
         # wrap optimizer
         client.center_optimizer = DPOptimizer(
             optimizer=client.center_optimizer,
-            noise_multiplier=1.3, # same as make_private arguments
+            # noise_multiplier=noise_multiplier, # same as make_private arguments
             max_grad_norm=1.0, # same as make_private arguments
             expected_batch_size=train_batch_size # if you're averaging your gradients, you need to know the denominator
         )
@@ -187,6 +189,9 @@ def main(server_pipe_endpoints):
             for _, client in connected_clients.items():
                 client.center_optimizer.zero_grad()
                 
+            epsilon, best_alpha = client.center_accountant.get_privacy_spent(delta=delta)
+            print(f"([server] ε = {epsilon:.2f}, δ = {delta}) for α = {best_alpha}")
+
 
         # # Testing
         # for _, client in connected_clients.items():
