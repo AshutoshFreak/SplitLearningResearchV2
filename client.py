@@ -75,7 +75,6 @@ class Client(Thread):
     def calculate_loss(self):
         self.criterion = F.nll_loss
         self.loss = self.criterion(self.outputs, self.targets)
-        self.losses.append(self.loss)
 
 
     def calculate_train_acc(self):
@@ -92,8 +91,9 @@ class Client(Thread):
             _, self.predicted = torch.max(self.outputs.data, 1)
             self.n_correct = (self.predicted == self.targets).sum().item()
             self.n_samples = self.targets.size(0)
-            self.test_acc.append(100.0 * self.n_correct/self.n_samples)
-            print(f'Acc: {self.test_acc[-1]}')
+            # self.test_acc.append(100.0 * self.n_correct/self.n_samples)
+            return 100.0 * self.n_correct/self.n_samples
+            # print(f'Acc: {self.test_acc[-1]}')
 
 
     def zero_grad(self):

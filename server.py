@@ -8,6 +8,7 @@ import pickle
 import torch
 import random
 from models import MNIST_CNN
+from utils.connections import get_object
 from concurrent.futures import ThreadPoolExecutor
 from utils.merge_grads import merge_grads
 import torch.optim as optim
@@ -93,9 +94,9 @@ class AcceptClients(Thread):
 
 
 def main(server_pipe_endpoints):
-    num_epochs = 200
-    train_batch_size = 128
-    test_batch_size = 128
+    num_epochs = 5
+    train_batch_size = 32
+    test_batch_size = 32
     HOST = 'localhost'
     PORT = 8000
     limit_clients = 1
@@ -126,83 +127,94 @@ def main(server_pipe_endpoints):
         client.center_accountant = RDPAccountant()
 
         # wrap model
-        # client.center_model = ModuleValidator.fix(client.center_model)
-        client.center_model = GradSampleModule(client.center_model)
+        #####################################
+        # client.center_model = GradSampleModule(client.center_model)
         client.center_model.to(client.device)
-    
+
         # initialize optimizer
         client.center_optimizer = optim.Adadelta(client.center_model.parameters(), lr=1)
         
-        # wrap optimizer
-        client.center_optimizer = DPOptimizer(
-            optimizer=client.center_optimizer,
-            # noise_multiplier=noise_multiplier, # same as make_private arguments
-            max_grad_norm=1.0, # same as make_private arguments
-            expected_batch_size=train_batch_size # if you're averaging your gradients, you need to know the denominator
-        )
+        
+        #####################################
+        # # wrap optimizer
+        # client.center_optimizer = DPOptimizer(
+        #     optimizer=client.center_optimizer,
+        #     # noise_multiplier=noise_multiplier, # same as make_private arguments
+        #     max_grad_norm=1.0, # same as make_private arguments
+        #     expected_batch_size=train_batch_size # if you're averaging your gradients, you need to know the denominator
+        # )
 
-        # attach accountant to track privacy for an optimizer
-        client.center_optimizer.attach_step_hook(
-            client.center_accountant.get_optimizer_hook_fn(
-            # this is an important parameter for privacy accounting. Should be equal to batch_size / len(dataset)
-            sample_rate=train_batch_size/60000
-            )
-        )
+        #####################################
+        # # attach accountant to track privacy for an optimizer
+        # client.center_optimizer.attach_step_hook(
+        #     client.center_accountant.get_optimizer_hook_fn(
+        #     # this is an important parameter for privacy accounting. Should be equal to batch_size / len(dataset)
+        #     sample_rate=train_batch_size/60000
+        #     )
+        # )
 
 
     with ThreadPoolExecutor() as executor:
         for _, client in connected_clients.items():
             executor.submit(client.send_model())
-        
+
+
+        first_client = list(connected_clients.values())[0]
+        num_epochs, num_iterations, num_test_iterations = get_object(first_client.conn)
+        print(num_epochs, num_iterations)
+
+
         # Training
         for epoch in range(num_epochs):
             print(f'\nEpoch: {epoch+1}')
-            for _, client in connected_clients.items():
-                executor.submit(client.get_remote_activations1())
+            for iteration in range(num_iterations):
+                for _, client in connected_clients.items():
+                    executor.submit(client.get_remote_activations1())
 
 
-            for _, client in connected_clients.items():
-                executor.submit(client.forward_center())
+                for _, client in connected_clients.items():
+                    executor.submit(client.forward_center())
 
 
-            for _, client in connected_clients.items():
-                executor.submit(client.send_remote_activations2())
+                for _, client in connected_clients.items():
+                    executor.submit(client.send_remote_activations2())
 
 
-            for _, client in connected_clients.items():
-                executor.submit(client.get_remote_activations2_grads())
-                executor.submit(client.backward_center())
+                for _, client in connected_clients.items():
+                    executor.submit(client.get_remote_activations2_grads())
+                    executor.submit(client.backward_center())
 
-            for _, client in connected_clients.items():
-                executor.submit(client.send_remote_activations1_grads())
+                for _, client in connected_clients.items():
+                    executor.submit(client.send_remote_activations1_grads())
 
-            params = []
-            for _, client in connected_clients.items():
-                params.append(client.center_model.parameters())
-            merge_grads(params)
-
-
-            for _, client in connected_clients.items():
-                client.center_optimizer.step()
+                params = []
+                for _, client in connected_clients.items():
+                    params.append(client.center_model.parameters())
+                merge_grads(params)
 
 
-            for _, client in connected_clients.items():
-                client.center_optimizer.zero_grad()
-                
-            epsilon, best_alpha = client.center_accountant.get_privacy_spent(delta=delta)
-            print(f"([server] ε = {epsilon:.2f}, δ = {delta}) for α = {best_alpha}")
+                for _, client in connected_clients.items():
+                    client.center_optimizer.step()
 
 
-        # # Testing
-        # for _, client in connected_clients.items():
-        #     executor.submit(client.get_remote_activations1())
+                for _, client in connected_clients.items():
+                    client.center_optimizer.zero_grad()
 
-        # for _, client in connected_clients.items():
-        #     executor.submit(client.forward_center())
+            ##########################################
+            # epsilon, best_alpha = client.center_accountant.get_privacy_spent(delta=delta)
+            # print(f"([server] ε = {epsilon:.2f}, δ = {delta}) for α = {best_alpha}")
 
-        # for _, client in connected_clients.items():
-        #     executor.submit(client.send_remote_activations2())
 
+            # Testing
+            for iteration in range(num_test_iterations):
+                for _, client in connected_clients.items():
+                    executor.submit(client.get_remote_activations1())
+
+                for _, client in connected_clients.items():
+                    executor.submit(client.forward_center())
+
+                for _, client in connected_clients.items():
+                    executor.submit(client.send_remote_activations2())
 
 
 if __name__ == "__main__":
