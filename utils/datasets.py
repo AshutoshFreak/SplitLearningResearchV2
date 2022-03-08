@@ -35,10 +35,10 @@ def CIFAR10(path):
 
 
 def load_full_dataset(dataset, dataset_path):
-    if dataset == 'MNIST':
+    if dataset == 'mnist':
         train_dataset, test_dataset = MNIST(dataset_path)
 
-    if dataset == 'CIFAR10':
+    if dataset == 'cifar10':
         train_dataset, test_dataset = CIFAR10(dataset_path)
     return train_dataset, test_dataset
     

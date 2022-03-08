@@ -232,16 +232,16 @@ def main(server_pipe_endpoints):
                 dummy_client.center_optimizer.zero_grad()
 
 
-        # Testing
-        for iteration in range(num_test_iterations):
-            for _, client in connected_clients.items():
-                executor.submit(client.get_remote_activations1())
+            # Testing
+            for iteration in range(num_test_iterations):
+                for _, client in connected_clients.items():
+                    executor.submit(client.get_remote_activations1())
 
-            for _, client in connected_clients.items():
-                executor.submit(client.forward_center())
+                for _, client in connected_clients.items():
+                    executor.submit(client.forward_center())
 
-            for _, client in connected_clients.items():
-                executor.submit(client.send_remote_activations2())
+                for _, client in connected_clients.items():
+                    executor.submit(client.send_remote_activations2())
 
 
 if __name__ == "__main__":
