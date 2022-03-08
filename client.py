@@ -10,11 +10,6 @@ from utils.split_dataset import DatasetFromSubset
 import pickle
 import queue
 import struct
-# pylint: disable=too-many-instance-attributes
-# pylint: disable=invalid-name
-# pylint: disable=missing-function-docstring
-# pylint: disable=missing-class-docstring
-
 
 
 class Client(Thread):
