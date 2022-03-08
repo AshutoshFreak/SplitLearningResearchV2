@@ -228,15 +228,16 @@ def main(server_pipe_endpoints, args):
 
 
             # Testing
-            for iteration in range(num_test_iterations):
-                for _, client in connected_clients.items():
-                    executor.submit(client.get_remote_activations1())
+            with torch.no_grad():
+                for iteration in range(num_test_iterations):
+                    for _, client in connected_clients.items():
+                        executor.submit(client.get_remote_activations1())
 
-                for _, client in connected_clients.items():
-                    executor.submit(client.forward_center())
+                    for _, client in connected_clients.items():
+                        executor.submit(client.forward_center())
 
-                for _, client in connected_clients.items():
-                    executor.submit(client.send_remote_activations2())
+                    for _, client in connected_clients.items():
+                        executor.submit(client.send_remote_activations2())
 
 
 if __name__ == "__main__":

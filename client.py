@@ -41,6 +41,8 @@ class Client(Thread):
         self.back_optimizer = None
         self.train_acc = []
         self.test_acc = []
+        self.front_epsilons = []
+        self.front_best_alphas = []
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # self.device = torch.device('cpu')
         

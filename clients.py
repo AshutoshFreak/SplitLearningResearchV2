@@ -56,7 +56,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "--server-side-tuning",
-        type=int,
+        type=bool,
         default=False,
         metavar="SST",
         help="State if server side tuning needs to be done",
@@ -140,6 +140,7 @@ if __name__ == "__main__":
     torch.multiprocessing.set_start_method('spawn')
 
     args = parse_arguments()
+    results = []
 
     # pipe endpoints for process communication through common RAM space
     server_pipe_endpoints = {}
@@ -382,6 +383,8 @@ if __name__ == "__main__":
                 # [Differential Privacy] get back epsilon with delta values
                 for _, client in clients.items():
                     front_epsilon, front_best_alpha = client.front_privacy_engine.accountant.get_privacy_spent(delta=args.delta)
+                    client.front_epsilons.append(front_epsilon)
+                    client.front_best_alphas.append(front_best_alpha)
                     print(f"([{client.id}] ε = {front_epsilon:.2f}, δ = {args.delta}) for α = {front_best_alpha}")
             
             if args.server_side_tuning:
@@ -447,48 +450,49 @@ if __name__ == "__main__":
                 # overall_acc.append(train_acc)
 
 
-        # Testing
-        test_acc = 0
-        overall_acc.append(0)
-        for _, client in clients.items():
-            client.test_acc.append(0)
-        for iteration in range(num_test_iterations):
-            # Setting up iterator for testing
-            for _, client in clients.items():
-                client.iterator = iter(client.test_DataLoader)
+            # Testing
+            with torch.no_grad():
+                test_acc = 0
+                overall_acc.append(0)
+                for _, client in clients.items():
+                    client.test_acc.append(0)
+                for iteration in range(num_test_iterations):
+                    # Setting up iterator for testing
+                    for _, client in clients.items():
+                        client.iterator = iter(client.test_DataLoader)
 
 
-            # call forward prop for each client
-            for _, client in clients.items():
-                executor.submit(client.forward_front())
+                    # call forward prop for each client
+                    for _, client in clients.items():
+                        executor.submit(client.forward_front())
 
 
-            # send activations to the server
-            for _, client in clients.items():
-                executor.submit(client.send_remote_activations1())
+                    # send activations to the server
+                    for _, client in clients.items():
+                        executor.submit(client.send_remote_activations1())
 
 
-            for _, client in clients.items():
-                executor.submit(client.get_remote_activations2())
+                    for _, client in clients.items():
+                        executor.submit(client.get_remote_activations2())
 
 
-            for _, client in clients.items():
-                executor.submit(client.forward_back())
+                    for _, client in clients.items():
+                        executor.submit(client.forward_back())
 
 
-            for _, client in clients.items():
-                executor.submit(client.calculate_loss())
+                    for _, client in clients.items():
+                        executor.submit(client.calculate_loss())
 
-            for _, client in clients.items():
-                client.test_acc[-1] += client.calculate_test_acc()
-        
-        for _, client in clients.items():
-            client.test_acc[-1] /= num_test_iterations
-            overall_acc[-1] += client.test_acc[-1]
-        
-        overall_acc[-1] /= args.number_of_clients
-        # print(f'Acc for epoch {epoch+1}: {overall_acc[-1]}')
-        print(f'Test Acc: {overall_acc[-1]}')
+                    for _, client in clients.items():
+                        client.test_acc[-1] += client.calculate_test_acc()
+                
+                for _, client in clients.items():
+                    client.test_acc[-1] /= num_test_iterations
+                    overall_acc[-1] += client.test_acc[-1]
+                
+                overall_acc[-1] /= args.number_of_clients
+                # print(f'Acc for epoch {epoch+1}: {overall_acc[-1]}')
+                print(f'Test Acc: {overall_acc[-1]}')
 
 
     # for client_id, client in clients.items():
