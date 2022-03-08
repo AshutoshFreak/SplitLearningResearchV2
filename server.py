@@ -99,7 +99,7 @@ def main(server_pipe_endpoints):
     test_batch_size = 32
     HOST = 'localhost'
     PORT = 8000
-    limit_clients = 1
+    limit_clients = 10
     noise_multiplier = 1.0
     delta = 1.6e-5
     accept_clients = AcceptClients(HOST, PORT, limit_clients)
@@ -118,7 +118,7 @@ def main(server_pipe_endpoints):
         client.train_fun = MNIST_CNN.train
         client.test_fun = MNIST_CNN.test
 
-    
+
     for client_id in connected_clients:
         client = connected_clients[client_id]
 
@@ -132,7 +132,7 @@ def main(server_pipe_endpoints):
         client.center_model.to(client.device)
 
         # initialize optimizer
-        client.center_optimizer = optim.Adadelta(client.center_model.parameters(), lr=1)
+        client.center_optimizer = optim.SGD(client.center_model.parameters(), lr=0.05)
         
         
         #####################################
