@@ -57,8 +57,9 @@ def parse_arguments():
     )
     parser.add_argument(
         "--server-side-tuning",
+        action=argparse.BooleanOptionalAction,
         type=bool,
-        default=False,
+        default=True,
         metavar="SST",
         help="State if server side tuning needs to be done",
     )
@@ -396,7 +397,7 @@ if __name__ == "__main__":
                 dummy_client.running_loss = 0
 
                 for iteration in range(num_iterations):
-                    print(f'\nEpoch: {epoch+1}, Iteration: {iteration+1}/{num_iterations}')
+                    print(f'\n[Server side tuning] Epoch: {epoch+1}, Iteration: {iteration+1}/{num_iterations}')
                     # forward prop for front model at dummy client
                     dummy_client.forward_front()
 
@@ -493,7 +494,7 @@ if __name__ == "__main__":
                     client.test_acc[-1] /= num_test_iterations
                     overall_acc[-1] += client.test_acc[-1]
                 
-                overall_acc[-1] /= args.number_of_clients
+                overall_acc[-1] /= len(clients)
                 # print(f'Acc for epoch {epoch+1}: {overall_acc[-1]}')
                 print(f'Test Acc: {overall_acc[-1]}')
 
@@ -505,6 +506,7 @@ if __name__ == "__main__":
     plt.ylabel('Test Accuracy')
     plt.xlabel('Epochs')
     plt.legend()
+    plt.ioff()
     plt.savefig(f'./results/test_acc_vs_epoch/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
     plt.show()
 
@@ -514,46 +516,60 @@ if __name__ == "__main__":
     plt.ylabel('Epsilon')
     plt.xlabel('Epochs')
     plt.legend()
+    plt.ioff()
     plt.savefig(f'./results/epsilon_vs_epoch/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
     plt.show()
 
 
-
     # picking up a random client and testing it's accuracy on overall test dataset
-    random_client_id = random.choice(client_ids)
-    random_client = copy.deepcopy(clients[random_client_id])
-    random_client_overall_acc = []
+    random_clients_overall_acc = {}
+    for random_client_id in clients:
+        # random_client_id = random.choice(client_ids)
+        # communicate the random client to the server
+        send_object(first_client.socket, random_client_id)
+        # ignoring creating a deepcopy of random client due to TypeError: cannot pickle '_thread.lock' object,
+        # and I don't have time to fix it right now. Must be fixed for a clean and less buggy code in future
+        # random_client = copy.deepcopy(clients[random_client_id])
+        random_client = clients[random_client_id]
+        random_client_overall_acc = 0
+        random_client.test_acc = []
 
-    with torch.no_grad():
-        for _, client in clients.items():
-            random_client.test_DataLoader = client.test_DataLoader
-            random_client.iterator = iter(client.test_DataLoader)
-            num_test_iterations = ceil(len(client.test_DataLoader.dataset)/args.batch_size)
-            random_client.test_acc.append(0)
-            for iteration in range(num_test_iterations):
-                print(f'\nClient: {client.id}, Iteration: {iteration+1}/{num__test_iterations}')
 
-                # forward prop for front model at dummy client
-                random_client.forward_front()
+        with torch.no_grad():
+            for _, client in clients.items():
+                random_client.test_DataLoader = client.test_DataLoader
+                random_client.iterator = iter(random_client.test_DataLoader)
+                num_test_iterations = ceil(len(random_client.test_DataLoader.dataset)/args.batch_size)
+                send_object(first_client.socket, num_test_iterations)
+                random_client.test_acc.append(0)
+                for iteration in range(num_test_iterations):
+                    print(f'\nClient: {client.id}, Iteration: {iteration+1}/{num_test_iterations}')
 
-                # send activations to the server at dummy client
-                random_client.send_remote_activations1()
+                    # forward prop for front model at random client
+                    random_client.forward_front()
 
-                # get remote activations from server at dummy client
-                random_client.get_remote_activations2()
+                    # send activations to the server at random client
+                    random_client.send_remote_activations1()
 
-                # forward prop for back model at dummy client
-                random_client.forward_back()
+                    # get remote activations from server at random client
+                    random_client.get_remote_activations2()
 
-                # calculate test accuracy for random client
-                random_client.test_acc[-1] += random_client.calculate_test_acc()
+                    # forward prop for back model at random client
+                    random_client.forward_back()
 
-            random_client.test_acc[-1] /= num_test_iterations
-            overall_acc[-1] += client.test_acc[-1]
-                
-            overall_acc[-1] /= args.number_of_clients
+                    # calculate test accuracy for random client
+                    random_client.test_acc[-1] += random_client.calculate_test_acc()
+
+                random_client.test_acc[-1] /= num_test_iterations
+                random_client_overall_acc += random_client.test_acc[-1]
+
+            random_client_overall_acc /= len(clients)
+            random_clients_overall_acc[random_client_id] = random_client_overall_acc
             # print(f'Acc for epoch {epoch+1}: {overall_acc[-1]}')
-            print(f'Test Acc: {overall_acc[-1]}')
+
+    # print(f'Test acc for random clients: {random_clients_overall_acc}')
+    for client_id in random_clients_overall_acc:
+        print(f'{client_id}: {random_clients_overall_acc[client_id]}')
 
     # for client_id, client in clients.items():
     #     plt.plot(list(range(args.epochs)), client.front_epsilons)

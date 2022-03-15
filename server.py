@@ -167,8 +167,6 @@ def main(server_pipe_endpoints, args):
         first_client = connected_clients[connected_client_ids[0]]
         num_iterations, num_test_iterations = get_object(first_client.conn)
 
-        print('server.py')
-        print(connected_client_ids)
         # Training
         for epoch in range(args.epochs):
             print(f'\nEpoch: {epoch+1}')
@@ -240,6 +238,20 @@ def main(server_pipe_endpoints, args):
                     for _, client in connected_clients.items():
                         executor.submit(client.send_remote_activations2())
 
+
+    for _ in connected_clients:
+        random_client_id = get_object(first_client.conn)
+        random_client = connected_clients[random_client_id]
+
+        with torch.no_grad():
+            for _, client in connected_clients.items():
+                num_test_iterations = get_object(first_client.conn)
+                for iteration in range(num_test_iterations):
+                    random_client.get_remote_activations1()
+
+                    random_client.forward_center()
+
+                    random_client.send_remote_activations2()
 
 if __name__ == "__main__":
     main(None, None)
