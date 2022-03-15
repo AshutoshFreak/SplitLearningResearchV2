@@ -154,9 +154,6 @@ def main(server_pipe_endpoints, args):
             executor.submit(client.send_model())
 
 
-        first_client = connected_clients[connected_client_ids[0]]
-        num_iterations, num_test_iterations = get_object(first_client.conn)
-
         if args.server_side_tuning:
             # [Server side tuning]
             # 1 client is kept as a dummy client and is stripped from 'clients' dict
@@ -166,8 +163,12 @@ def main(server_pipe_endpoints, args):
             connected_client_ids = connected_client_ids[1:]
             dummy_client = connected_clients[dummy_client_id]
             connected_clients.pop(dummy_client_id)
+        
+        first_client = connected_clients[connected_client_ids[0]]
+        num_iterations, num_test_iterations = get_object(first_client.conn)
 
-
+        print('server.py')
+        print(connected_client_ids)
         # Training
         for epoch in range(args.epochs):
             print(f'\nEpoch: {epoch+1}')

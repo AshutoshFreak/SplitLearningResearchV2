@@ -45,42 +45,19 @@ class Client(Thread):
         self.front_best_alphas = []
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # self.device = torch.device('cpu')
-        
-
-    def forward_front(self):
-        self.data, self.targets = next(self.iterator)
-        # self.data = self.data.reshape(-1, 784).to(self.device)
-        self.data, self.targets = self.data.to(self.device), self.targets.to(self.device)
-
-        self.activations1 = self.front_model(self.data)
-        self.remote_activations1 = self.activations1.detach().requires_grad_(True)
-
-
-
-    def forward_back(self):
-        self.outputs = self.back_model(self.remote_activations2)
-
-
-    def backward_front(self):
-        self.activations1.backward(self.remote_activations1.grad)
 
 
     def backward_back(self):
         self.loss.backward()
 
 
+    def backward_front(self):
+        self.activations1.backward(self.remote_activations1.grad)
+
+
     def calculate_loss(self):
         self.criterion = F.nll_loss
         self.loss = self.criterion(self.outputs, self.targets)
-
-
-    def calculate_train_acc(self):
-        with torch.no_grad():
-            _, self.predicted = torch.max(self.outputs.data, 1)
-            self.n_correct = (self.predicted == self.targets).sum().item()
-            self.n_samples = self.targets.size(0)
-            self.train_acc.append(100.0 * self.n_correct/self.n_samples)
-            print(f'Acc: {self.train_acc[-1]}')
 
 
     def calculate_test_acc(self):
@@ -93,28 +70,68 @@ class Client(Thread):
             # print(f'Acc: {self.test_acc[-1]}')
 
 
-    def zero_grad(self):
-        self.front_optimizer.zero_grad()
-        self.back_optimizer.zero_grad()
+    def calculate_train_acc(self):
+        with torch.no_grad():
+            _, self.predicted = torch.max(self.outputs.data, 1)
+            self.n_correct = (self.predicted == self.targets).sum().item()
+            self.n_samples = self.targets.size(0)
+            self.train_acc.append(100.0 * self.n_correct/self.n_samples)
+            print(f'Acc: {self.train_acc[-1]}')
 
 
-    def step(self):
-        self.front_optimizer.step()
-        self.back_optimizer.step()
+    def connect_server(self, host='localhost', port=8000, BUFFER_SIZE=4096):
+        self.socket, self.server_socket = multiprocessing.Pipe()
+        print(f"[*] Client {self.id} connecting to {host}")
 
 
-    # def onThread(self, function, *args, **kwargs):
-    #     self.q.put((function, args, kwargs))
+    def create_DataLoader(self, train_batch_size, test_batch_size):
+        self.train_batch_size = train_batch_size
+        self.test_batch_size = test_batch_size
+        self.train_DataLoader = torch.utils.data.DataLoader(dataset=self.train_dataset,
+                                                batch_size=self.train_batch_size,
+                                                shuffle=True)
+        self.test_DataLoader = torch.utils.data.DataLoader(dataset=self.test_dataset,
+                                                batch_size=self.test_batch_size,
+                                                shuffle=True)
 
 
-    # def run(self, *args, **kwargs):
-    #     super(Client, self).run(*args, **kwargs)
-    #     while True:
-    #         try:
-    #             function, args, kwargs = self.q.get(timeout=self.timeout)
-    #             function(*args, **kwargs)
-    #         except queue.Empty:
-    #             self.idle()
+    def disconnect_server(self) -> bool:
+        if not is_socket_closed(self.socket):
+            self.socket.close()
+            return True
+        else:
+            return False
+
+
+    def forward_back(self):
+        self.outputs = self.back_model(self.remote_activations2)
+
+
+    def forward_front(self):
+        self.data, self.targets = next(self.iterator)
+        # self.data = self.data.reshape(-1, 784).to(self.device)
+        self.data, self.targets = self.data.to(self.device), self.targets.to(self.device)
+
+        self.activations1 = self.front_model(self.data)
+        self.remote_activations1 = self.activations1.detach().requires_grad_(True)
+
+
+    # def getModel(self):
+    #     self.onThread(self._getModel)
+
+
+    def get_model(self):
+        model = get_object(self.socket)
+        self.front_model = model['front']
+        self.back_model = model['back']
+
+
+    def get_remote_activations1_grads(self):
+        self.remote_activations1.grad = get_object(self.socket)
+
+
+    def get_remote_activations2(self):
+        self.remote_activations2 = get_object(self.socket)
 
 
     def idle(self):
@@ -137,28 +154,18 @@ class Client(Thread):
         )
 
 
-    def create_DataLoader(self, train_batch_size, test_batch_size):
-        self.train_batch_size = train_batch_size
-        self.test_batch_size = test_batch_size
-        self.train_DataLoader = torch.utils.data.DataLoader(dataset=self.train_dataset,
-                                                batch_size=self.train_batch_size,
-                                                shuffle=True)
-        self.test_DataLoader = torch.utils.data.DataLoader(dataset=self.test_dataset,
-                                                batch_size=self.test_batch_size,
-                                                shuffle=True)
+    # def onThread(self, function, *args, **kwargs):
+    #     self.q.put((function, args, kwargs))
 
 
-    def connect_server(self, host='localhost', port=8000, BUFFER_SIZE=4096):
-        self.socket, self.server_socket = multiprocessing.Pipe()
-        print(f"[*] Client {self.id} connecting to {host}")
-
-
-    def disconnect_server(self) -> bool:
-        if not is_socket_closed(self.socket):
-            self.socket.close()
-            return True
-        else:
-            return False
+    # def run(self, *args, **kwargs):
+    #     super(Client, self).run(*args, **kwargs)
+    #     while True:
+    #         try:
+    #             function, args, kwargs = self.q.get(timeout=self.timeout)
+    #             function(*args, **kwargs)
+    #         except queue.Empty:
+    #             self.idle()
 
 
     def send_remote_activations1(self):
@@ -169,12 +176,9 @@ class Client(Thread):
         send_object(self.socket, self.remote_activations2.grad)
 
 
-    def get_remote_activations1_grads(self):
-        self.remote_activations1.grad = get_object(self.socket)
-
-
-    def get_remote_activations2(self):
-        self.remote_activations2 = get_object(self.socket)
+    def step(self):
+        self.front_optimizer.step()
+        self.back_optimizer.step()
 
 
     # def train_model(self):
@@ -187,12 +191,6 @@ class Client(Thread):
     #     backward_front_model()
 
 
-    # def _getModel(self):
-    def get_model(self):
-        model = get_object(self.socket)
-        self.front_model = model['front']
-        self.back_model = model['back']
-    
-    
-    # def getModel(self):
-    #     self.onThread(self._getModel)    
+    def zero_grad(self):
+        self.front_optimizer.zero_grad()
+        self.back_optimizer.zero_grad()
