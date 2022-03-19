@@ -143,3 +143,6 @@ generate_results.sh
 
 # VS Code
 .vscode/
+
+# Syncthing
+.stfolder
