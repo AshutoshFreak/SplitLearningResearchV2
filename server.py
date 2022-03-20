@@ -69,7 +69,6 @@ class AcceptClients(Thread):
         Thread.__init__(self)
         self.host = host
         self.port = port
-        # self.keepRunning = True
         self.limit = limit
     
 
@@ -83,14 +82,6 @@ class AcceptClients(Thread):
             print(f'Total clients connected: {ThreadCount}')
         
         return ServerSocket
-        # self.keepRunning = False
-
-        # ServerSocket.close()
-        # print('socket closed')
-
-
-    # def stop(self):
-    #     self.keepRunning = False
 
 
 def main(server_pipe_endpoints, args):
@@ -103,26 +94,24 @@ def main(server_pipe_endpoints, args):
     # time.sleep(10)
     # accept_clients.stop()
 
-    # print(len(connected_clients))
 
     for client_id in connected_clients:
         client = connected_clients[client_id]
         client.front_model = MNIST_CNN.front()
         client.back_model = MNIST_CNN.back()
         client.center_model = MNIST_CNN.center()
-        # client.train_fun = MNIST_CNN.train
-        # client.test_fun = MNIST_CNN.test
 
 
     for client_id in connected_clients:
         client = connected_clients[client_id]
 
+        # [Differential Privacy]
         # Attaching PrivacyEngine to center model
         # initialize privacy accountant
         # client.center_accountant = RDPAccountant()
 
+        # # [Differential Privacy]
         # wrap model
-        #####################################
         # client.center_model = GradSampleModule(client.center_model)
         client.center_model.to(client.device)
 
@@ -130,16 +119,16 @@ def main(server_pipe_endpoints, args):
         client.center_optimizer = optim.SGD(client.center_model.parameters(), lr=0.05)
         
         
-        #####################################
+        # # [Differential Privacy]
         # # wrap optimizer
         # client.center_optimizer = DPOptimizer(
         #     optimizer=client.center_optimizer,
-        #     # noise_multiplier=noise_multiplier, # same as make_private arguments
+        #     noise_multiplier=args.server_sigma, # same as make_private arguments
         #     max_grad_norm=1.0, # same as make_private arguments
         #     expected_batch_size=args.batch_size # if you're averaging your gradients, you need to know the denominator
         # )
 
-        #####################################
+        # # [Differential Privacy]
         # # attach accountant to track privacy for an optimizer
         # client.center_optimizer.attach_step_hook(
         #     client.center_accountant.get_optimizer_hook_fn(
@@ -204,12 +193,12 @@ def main(server_pipe_endpoints, args):
                     client.center_optimizer.zero_grad()
 
             ##########################################
-            # epsilon, best_alpha = client.center_accountant.get_privacy_spent(delta=delta)
-            # print(f"([server] ε = {epsilon:.2f}, δ = {delta}) for α = {best_alpha}")
+            # epsilon, best_alpha = client.center_accountant.get_privacy_spent(delta=args.delta)
+            # print(f"([server] ε = {epsilon:.2f}, δ = {args.delta}) for α = {best_alpha}")
 
             if args.server_side_tuning:
                 # [server side tuning]
-                print('Server side tuning')
+                print('\nServer side tuning')
                 for iteration in range(num_iterations):
                     dummy_client.get_remote_activations1()
                     dummy_client.forward_center()

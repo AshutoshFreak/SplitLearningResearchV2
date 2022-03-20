@@ -2,7 +2,6 @@ import os
 import random
 import string
 import socket
-import tqdm
 import requests
 import sys
 import threading
@@ -99,6 +98,13 @@ def parse_arguments():
         default=1.0,
         metavar="S",
         help="Noise multiplier",
+    )
+    parser.add_argument(
+        "--server-sigma",
+        type=float,
+        default=0,
+        metavar="SS",
+        help="Noise multiplier for central layers",
     )
     parser.add_argument(
         "-g",
@@ -316,7 +322,7 @@ if __name__ == "__main__":
                 client.running_loss = 0
 
             for iteration in range(num_iterations):
-                print(f'\nEpoch: {epoch+1}, Iteration: {iteration+1}/{num_iterations}')
+                print(f'\rEpoch: {epoch+1}, Iteration: {iteration+1}/{num_iterations}', end='')
                 # forward prop for front model at each client
                 for _, client in clients.items():
                     executor.submit(client.forward_front())
@@ -392,12 +398,11 @@ if __name__ == "__main__":
 
             # [server side tuning]
             if args.server_side_tuning:
-                print('server side tuning')
                 dummy_client.iterator = iter(dummy_client.train_DataLoader)
                 dummy_client.running_loss = 0
 
                 for iteration in range(num_iterations):
-                    print(f'\n[Server side tuning] Epoch: {epoch+1}, Iteration: {iteration+1}/{num_iterations}')
+                    print(f'\r[Server side tuning] Epoch: {epoch+1}, Iteration: {iteration+1}/{num_iterations}', end='')
                     # forward prop for front model at dummy client
                     dummy_client.forward_front()
 
@@ -543,7 +548,7 @@ if __name__ == "__main__":
                 send_object(first_client.socket, num_test_iterations)
                 random_client.test_acc.append(0)
                 for iteration in range(num_test_iterations):
-                    print(f'\nClient: {client.id}, Iteration: {iteration+1}/{num_test_iterations}')
+                    print(f'\rClient: {client.id}, Iteration: {iteration+1}/{num_test_iterations}', end='')
 
                     # forward prop for front model at random client
                     random_client.forward_front()
