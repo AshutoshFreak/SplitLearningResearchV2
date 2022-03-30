@@ -23,6 +23,7 @@ SEED = 2646
 random.seed(SEED)
 torch.manual_seed(SEED)
 
+# variable to store active number of threads
 ThreadCount = 0
 
 def increaseThreadCount():
@@ -38,31 +39,11 @@ def decreaseThreadCount():
 def getThreadCount():
     return ThreadCount
 
-# def threaded_client(connection):
-#     data = connection.recv(4096)
-#     if not data:
-#         print(f'\n[*] Disconnected from {connection.getpeername()[0]}:{connection.getpeername()[1]}')
-#         connection.close()
-#         decreaseThreadCount()
-#         print(f'Total clients connected: {getThreadCount()}')w
-#         break
-#     reply = ''
-#     try:
-#         target, message = data.split('/')
-#         ip, port = target.split(':')
-        
-#         port = int(port)
-#         target = (ip, port)
-#         if target not in mapping.keys():
-#             reply = '[*] Server Error: Cannot find specified target client'
-#         else:
-#             source = connection.getpeername()
-#     except:
-#         reply = '[*] Parse Error: Invalid Input Format'
 
-#     if reply != '':
-#         connection.sendall(reply)
-
+# This class handles client connections. It's meant to run in parallel
+# and accept upcoming client connection requests.
+# stores all connected clients in connected_clients dictionary with their id as key
+# and ConnectedClient object as value
 connected_clients = {}
 class AcceptClients(Thread):
     def __init__(self, host, port, limit):
