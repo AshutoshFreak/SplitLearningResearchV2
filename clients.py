@@ -150,7 +150,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     results = []
 
-    # pipe endpoints for process communication through common RAM space
+    # pipe endpoints for process communication through common memory space meant for server
     server_pipe_endpoints = {}
 
     # Choose dataset. 

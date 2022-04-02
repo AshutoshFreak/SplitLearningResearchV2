@@ -35,12 +35,7 @@ def split_dataset(dataset: str, client_ids: list, output_dir='data'):
     # print(type(train_datasets[0]))
     for i in range(len(client_ids)):
         out_dir = f'{output_dir}/{dataset}/{client_ids[i]}'
-        # out_dir = f'data/client_data/{client_ids[id]}/{dataset}'
         os.makedirs(out_dir + '/train', exist_ok=True)
         os.makedirs(out_dir + '/test', exist_ok=True)
-        # with open(f'{out_dir}/train/{client_ids[i]}.pkl', 'wb') as file:
-        #     pickle.dump(train_datasets[i], file)
-        # with open(f'{out_dir}/test/{client_ids[i]}.pkl', 'wb') as file:
-        #     pickle.dump(test_datasets[i], file)
         torch.save(train_datasets[i], out_dir + f'/train/{client_ids[i]}.pt')
         torch.save(test_datasets[i], out_dir + f'/test/{client_ids[i]}.pt')

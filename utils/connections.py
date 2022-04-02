@@ -20,28 +20,10 @@ def is_socket_closed(sock: socket.socket) -> bool:
 
 
 def send_object(socket, data):
-    # data = pickle.dumps(data)
-    # HEADERSIZE = 10
-    # data = bytes(f'{len(data):<{HEADERSIZE}}', 'utf-8') + data
     socket.send(data)
 
 
 def get_object(socket):
-    # HEADERSIZE = 10
-    # full_data = b''
-    # new_data = True
     data = socket.recv()
-    # while not data:
-    #     data = socket.recv()
-        # if new_data:
-        #     datalen = int(data[:HEADERSIZE])
-        #     new_data = False
-        
-        # full_data += data
-        
-        # if len(full_data) - HEADERSIZE == datalen:
-        #     d = pickle.loads(full_data[HEADERSIZE:])
-        #     break
-    
     return data
     

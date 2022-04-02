@@ -94,10 +94,10 @@ class ConnectedClient(object):
         # handle(self.conn, self.address, model)
 
 
-    def send_optimizers(self):
-        # This is just a sample code and NOT optimizers. Need to write code for initializing optimizers
-        optimizers = {'front': self.front_model.parameters(), 'back': self.back_model.parameters()}
-        send_object(self.conn, optimizers)
+    # def send_optimizers(self):
+    #     # This is just a sample code and NOT optimizers. Need to write code for initializing optimizers
+    #     optimizers = {'front': self.front_model.parameters(), 'back': self.back_model.parameters()}
+    #     send_object(self.conn, optimizers)
 
 
     def send_activations(self, activations):
