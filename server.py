@@ -7,7 +7,7 @@ import time
 import pickle
 import torch
 import random
-from models import MNIST_CNN
+from models import CIFAR10_CNN
 from utils.connections import get_object
 from concurrent.futures import ThreadPoolExecutor
 from utils.merge_grads import merge_grads
@@ -78,9 +78,9 @@ def main(server_pipe_endpoints, args):
 
     for client_id in connected_clients:
         client = connected_clients[client_id]
-        client.front_model = MNIST_CNN.front()
-        client.back_model = MNIST_CNN.back()
-        client.center_model = MNIST_CNN.center()
+        client.front_model = CIFAR10_CNN.front()
+        client.back_model = CIFAR10_CNN.back()
+        client.center_model = CIFAR10_CNN.center()
 
 
     for client_id in connected_clients:
@@ -97,7 +97,7 @@ def main(server_pipe_endpoints, args):
         client.center_model.to(client.device)
 
         # initialize optimizer
-        client.center_optimizer = optim.SGD(client.center_model.parameters(), lr=0.05)
+        client.center_optimizer = optim.SGD(client.center_model.parameters(), lr=0.05, momentum=0.9)
         
         
         # # [Differential Privacy]
