@@ -56,7 +56,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "--server-side-tuning",
-        action=argparse.BooleanOptionalAction,
+        # action=argparse.BooleanOptionalAction,
         type=bool,
         default=True,
         metavar="SST",
