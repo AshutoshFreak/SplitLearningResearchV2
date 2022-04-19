@@ -179,9 +179,10 @@ if __name__ == "__main__":
     # executor.submit will enable each function to run in separate threads for each client
     with Executor() as executor:
         # define normalization transform
-        transform=transforms.Compose([
-                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-                ])
+        # transform=transforms.Compose([
+        #         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        #         ])
+        transform = None
 
 
         ## client object initialization phase

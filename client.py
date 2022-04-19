@@ -56,7 +56,7 @@ class Client(Thread):
 
 
     def calculate_loss(self):
-        self.criterion = F.nll_loss
+        self.criterion = F.cross_entropy
         self.loss = self.criterion(self.outputs, self.targets)
 
 
