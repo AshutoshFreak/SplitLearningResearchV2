@@ -180,7 +180,7 @@ if __name__ == "__main__":
     with Executor() as executor:
         # define normalization transform
         transform=transforms.Compose([
-                transforms.Normalize((0.1307,), (0.3081,))
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
                 ])
 
 
@@ -242,12 +242,12 @@ if __name__ == "__main__":
         # initialize optimizer for each client
         for _, client in clients.items():
             client.front_model = ModuleValidator.fix(client.front_model)
-            client.front_optimizer = optim.SGD(client.front_model.parameters(), lr=args.lr)
+            client.front_optimizer = optim.SGD(client.front_model.parameters(), lr=args.lr, momentum=0.9)
 
         # [server side tuning]
         if args.server_side_tuning:
             # initialize front optimizer for dummy client
-            dummy_client.front_optimizer = optim.SGD(dummy_client.front_model.parameters(), lr=args.lr)
+            dummy_client.front_optimizer = optim.SGD(dummy_client.front_model.parameters(), lr=args.lr, momentum=0.9)
 
 
         # [Differential Privacy]
@@ -274,7 +274,7 @@ if __name__ == "__main__":
             # client.back_model = GradSampleModule(client.back_model)
 
             # initialize back optimizer
-            client.back_optimizer = optim.SGD(client.back_model.parameters(), lr=args.lr)
+            client.back_optimizer = optim.SGD(client.back_model.parameters(), lr=args.lr, momentum=0.9)
 
             # # [Differential Privacy]
             # # wrap back optimizer
@@ -296,7 +296,7 @@ if __name__ == "__main__":
         # [server side tuning]
         if args.server_side_tuning:
             # initialize back optimizer for dummy client
-            dummy_client.back_optimizer = optim.SGD(dummy_client.back_model.parameters(), lr=args.lr)
+            dummy_client.back_optimizer = optim.SGD(dummy_client.back_model.parameters(), lr=args.lr, momentum=0.9)
 
 
         # calculate number of iterations
@@ -315,7 +315,7 @@ if __name__ == "__main__":
             # # initialize optimizer for each client
             # for _, client in clients.items():
             #     client.front_model = ModuleValidator.fix(client.front_model)
-            #     client.front_optimizer = optim.SGD(client.front_model.parameters(), lr=args.lr)
+            #     client.front_optimizer = optim.SGD(client.front_model.parameters(), lr=args.lr, momentum=0.9)
             # set iterator for each client and set running loss to 0
             for _, client in clients.items():
                 client.iterator = iter(client.train_DataLoader)
