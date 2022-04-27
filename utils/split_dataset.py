@@ -21,6 +21,7 @@ class DatasetFromSubset(Dataset):
 
 
 def split_dataset(dataset: str, client_ids: list, output_dir='data'):
+    print('Splitting dataset (may take some time)...', end='')
     train_dataset, test_dataset = datasets.load_full_dataset(dataset, output_dir)
     per_client_trainset_size = len(train_dataset)//len(client_ids)
     train_split = [per_client_trainset_size]*len(client_ids)
@@ -39,3 +40,4 @@ def split_dataset(dataset: str, client_ids: list, output_dir='data'):
         os.makedirs(out_dir + '/test', exist_ok=True)
         torch.save(train_datasets[i], out_dir + f'/train/{client_ids[i]}.pt')
         torch.save(test_datasets[i], out_dir + f'/test/{client_ids[i]}.pt')
+    print('Done')

@@ -139,6 +139,12 @@ def parse_arguments():
         default="mnist",
         help="States dataset to be used",
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="MNIST_CNN",
+        help="Model you would like to train",
+    )
     args = parser.parse_args()
     return args
 
@@ -146,6 +152,7 @@ def parse_arguments():
 # main
 if __name__ == "__main__":
     torch.multiprocessing.set_start_method('spawn')
+    torch.multiprocessing.set_sharing_strategy('file_system')
 
     args = parse_arguments()
     results = []
@@ -170,9 +177,7 @@ if __name__ == "__main__":
 
 
     # split dataset between clients
-    print('Splitting dataset...', end='')
     split_dataset(args.dataset, client_ids)
-    print('Done')
 
     print(f'Random client ids:{str(client_ids)}')
 
