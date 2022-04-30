@@ -224,6 +224,7 @@ if __name__ == "__main__":
         #     print(client.front_model)
 
         for _, client in clients.items():
+            # print(client.device)
             client.front_model.to(client.device)
             client.back_model.to(client.device)
 
@@ -595,4 +596,4 @@ if __name__ == "__main__":
 
     # print('Test accuracy for each client:')
     # for client_id, client in clients.items():
-    #         print(f'{client_id}:{client.test_acc}')
+    #         print(f'{client_id}:{client.test_acc}')a
