@@ -123,7 +123,7 @@ def main(server_pipe_endpoints, args):
 
     with ThreadPoolExecutor() as executor:
         for _, client in connected_clients.items():
-            executor.submit(client.send_model())
+            (client.send_model())
 
 
         if args.server_side_tuning:
@@ -144,23 +144,23 @@ def main(server_pipe_endpoints, args):
             print(f'\nEpoch: {epoch+1}')
             for iteration in range(num_iterations):
                 for _, client in connected_clients.items():
-                    executor.submit(client.get_remote_activations1())
+                    (client.get_remote_activations1())
 
 
                 for _, client in connected_clients.items():
-                    executor.submit(client.forward_center())
+                    (client.forward_center())
 
 
                 for _, client in connected_clients.items():
-                    executor.submit(client.send_remote_activations2())
+                    (client.send_remote_activations2())
 
 
                 for _, client in connected_clients.items():
-                    executor.submit(client.get_remote_activations2_grads())
-                    executor.submit(client.backward_center())
+                    (client.get_remote_activations2_grads())
+                    (client.backward_center())
 
                 for _, client in connected_clients.items():
-                    executor.submit(client.send_remote_activations1_grads())
+                    (client.send_remote_activations1_grads())
 
                 params = []
                 for _, client in connected_clients.items():
@@ -202,13 +202,13 @@ def main(server_pipe_endpoints, args):
             with torch.no_grad():
                 for iteration in range(num_test_iterations):
                     for _, client in connected_clients.items():
-                        executor.submit(client.get_remote_activations1())
+                        (client.get_remote_activations1())
 
                     for _, client in connected_clients.items():
-                        executor.submit(client.forward_center())
+                        (client.forward_center())
 
                     for _, client in connected_clients.items():
-                        executor.submit(client.send_remote_activations2())
+                        (client.send_remote_activations2())
 
 
     for _ in connected_clients:

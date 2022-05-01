@@ -189,7 +189,7 @@ if __name__ == "__main__":
 
     print(f'Random client ids:{str(client_ids)}')
 
-    # executor.submit will enable each function to run in separate threads for each client
+    #  will enable each function to run in separate threads for each client
     with Executor() as executor:
         # define normalization transform
         # transform=transforms.Compose([
@@ -202,14 +202,14 @@ if __name__ == "__main__":
         print('Initializing clients...')
         # all clients concurrently create dataloaders
         for _, client in clients.items():
-            executor.submit(initialize_client(client, args.dataset, args.batch_size, args.test_batch_size, transform))
+            (initialize_client(client, args.dataset, args.batch_size, args.test_batch_size, transform))
         # initialization phase complete
         print('Client Intialization complete.')
 
 
         # all clients connect to the server
         for _, client in clients.items():
-            executor.submit(client.connect_server())
+            (client.connect_server())
 
         for client_id in clients:
             server_pipe_endpoints[client_id] = clients[client_id].server_socket
@@ -223,7 +223,7 @@ if __name__ == "__main__":
         # all clients get model from the server
         print('Getting model from server...', end='')
         for _, client in clients.items():
-            executor.submit(client.get_model())
+            (client.get_model())
         print('Done')
 
 
@@ -340,62 +340,62 @@ if __name__ == "__main__":
                 print(f'\rEpoch: {epoch+1}, Iteration: {iteration+1}/{num_iterations}', end='')
                 # forward prop for front model at each client
                 for _, client in clients.items():
-                    executor.submit(client.forward_front())
+                    (client.forward_front())
 
 
                 # send activations to the server at each client
                 for _, client in clients.items():
-                    executor.submit(client.send_remote_activations1())
+                    (client.send_remote_activations1())
 
 
                 # get remote activations from server at each client
                 for _, client in clients.items():
-                    executor.submit(client.get_remote_activations2())
+                    (client.get_remote_activations2())
 
 
                 # forward prop for back model at each client
                 for _, client in clients.items():
-                    executor.submit(client.forward_back())
+                    (client.forward_back())
 
 
                 # calculate loss at each client
                 for _, client in clients.items():
-                    executor.submit(client.calculate_loss())
+                    (client.calculate_loss())
 
 
                 # # calculate training accuracy at each client
                 # for _, client in clients.items():
-                #     executor.submit(client.calculate_train_acc())
+                #     (client.calculate_train_acc())
 
 
                 # backprop for back model at each client
                 for _, client in clients.items():
-                    executor.submit(client.backward_back())
+                    (client.backward_back())
 
 
                 # send gradients to server
                 for _, client in clients.items():
-                    executor.submit(client.send_remote_activations2_grads())
+                    (client.send_remote_activations2_grads())
 
 
                 # get gradients from server
                 for _, client in clients.items():
-                    executor.submit(client.get_remote_activations1_grads())
+                    (client.get_remote_activations1_grads())
 
 
                 # backprop for front model at each client
                 for _, client in clients.items():
-                    executor.submit(client.backward_front())
+                    (client.backward_front())
 
 
                 # update weights of both front and back model at each client
                 for _, client in clients.items():
-                    executor.submit(client.step())
+                    (client.step())
 
 
                 # zero out all gradients at each client
                 for _, client in clients.items():
-                    executor.submit(client.zero_grad())
+                    (client.zero_grad())
 
 
                 # add losses for each iteration
@@ -497,24 +497,24 @@ if __name__ == "__main__":
 
                     # call forward prop for each client
                     for _, client in clients.items():
-                        executor.submit(client.forward_front())
+                        (client.forward_front())
 
 
                     # send activations to the server
                     for _, client in clients.items():
-                        executor.submit(client.send_remote_activations1())
+                        (client.send_remote_activations1())
 
 
                     for _, client in clients.items():
-                        executor.submit(client.get_remote_activations2())
+                        (client.get_remote_activations2())
 
 
                     for _, client in clients.items():
-                        executor.submit(client.forward_back())
+                        (client.forward_back())
 
 
                     # for _, client in clients.items():
-                    #     executor.submit(client.calculate_loss())
+                    #     (client.calculate_loss())
 
 
                     for _, client in clients.items():
@@ -538,7 +538,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.ioff()
     plt.savefig(f'./results/test_acc_vs_epoch/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
-    plt.show()
+    plt.close()
 
 
     plt.plot(list(range(args.epochs)), first_client.front_epsilons)
@@ -548,17 +548,17 @@ if __name__ == "__main__":
     plt.legend()
     plt.ioff()
     plt.savefig(f'./results/epsilon_vs_epoch/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
-    plt.show()
+    plt.close()
 
 
     plt.plot(first_client.front_epsilons, overall_acc)
     plt.title(f'{args.number_of_clients} Accuracy vs. Epsilon')
-    plt.ylabel('Epsilon')
-    plt.xlabel('Average Test Acc.')
+    plt.ylabel('Average Test Acc.')
+    plt.xlabel('Epsilon')
     plt.legend()
     plt.ioff()
     plt.savefig(f'./results/acc_vs_epsilon/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
-    plt.show()
+    plt.close()
 
 
 
