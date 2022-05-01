@@ -7,7 +7,6 @@ import time
 import pickle
 import torch
 import random
-from models import MNIST_CNN
 from utils.connections import get_object
 from concurrent.futures import ThreadPoolExecutor
 from utils.merge_grads import merge_grads
@@ -17,6 +16,7 @@ from opacus.accountants import RDPAccountant
 from opacus import GradSampleModule
 from opacus.optimizers import DPOptimizer
 from opacus.validators import ModuleValidator
+import importlib
 # import requests
 
 SEED = 2646
@@ -77,10 +77,12 @@ def main(server_pipe_endpoints, args):
 
 
     for client_id in connected_clients:
+        # import model asked by the user
+        model = importlib.import_module(f'models.{args.model}')
         client = connected_clients[client_id]
-        client.front_model = MNIST_CNN.front()
-        client.back_model = MNIST_CNN.back()
-        client.center_model = MNIST_CNN.center()
+        client.front_model = model.front()
+        client.back_model = model.back()
+        client.center_model = model.center()
 
 
     for client_id in connected_clients:

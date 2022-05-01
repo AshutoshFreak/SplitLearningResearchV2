@@ -140,6 +140,12 @@ def parse_arguments():
         default="mnist",
         help="States dataset to be used",
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="MNIST_CNN",
+        help="Model you would like to train",
+    )
     args = parser.parse_args()
     return args
 
@@ -174,9 +180,7 @@ if __name__ == "__main__":
 
 
     # split dataset between clients
-    print('Splitting dataset...', end='')
     split_dataset(args.dataset, client_ids)
-    print('Done')
 
     print(f'Random client ids:{str(client_ids)}')
 
@@ -223,6 +227,7 @@ if __name__ == "__main__":
         #     print(client.front_model)
 
         for _, client in clients.items():
+            # print(client.device)
             client.front_model.to(client.device)
             client.back_model.to(client.device)
 
@@ -594,4 +599,4 @@ if __name__ == "__main__":
 
     # print('Test accuracy for each client:')
     # for client_id, client in clients.items():
-    #         print(f'{client_id}:{client.test_acc}')
+    #         print(f'{client_id}:{client.test_acc}')a
