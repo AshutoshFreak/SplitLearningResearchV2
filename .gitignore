@@ -147,3 +147,6 @@ generate_results.sh
 # Syncthing
 .stfolder*/
 .stignore/
+
+# memray
+memray-*
