@@ -27,9 +27,9 @@ import argparse
 import copy
 
 
-SEED = 2647
-random.seed(SEED)
-torch.manual_seed(SEED)
+# SEED = 2647
+# random.seed(SEED)
+# torch.manual_seed(SEED)
 
 
 # sets client attributes passed to the function
@@ -145,6 +145,12 @@ def parse_arguments():
         default="MNIST_CNN",
         help="Model you would like to train",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=2647,
+        help="Random Seed",
+    )
     args = parser.parse_args()
     return args
 
@@ -155,7 +161,9 @@ if __name__ == "__main__":
     torch.multiprocessing.set_sharing_strategy('file_system')
 
     args = parse_arguments()
-    results = []
+
+    random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
     # pipe endpoints for process communication through common memory space meant for server
     server_pipe_endpoints = {}
@@ -223,10 +231,10 @@ if __name__ == "__main__":
         # for _, client in clients.items():
         #     print(client.front_model)
 
-        for _, client in clients.items():
+        # for _, client in clients.items():
             # print(client.device)
-            client.front_model.to(client.device)
-            client.back_model.to(client.device)
+            # client.front_model.to(client.device)
+            # client.back_model.to(client.device)
 
 
         # [server side tuning]
@@ -393,6 +401,16 @@ if __name__ == "__main__":
                 # add losses for each iteration
                 for _, client in clients.items():
                     client.running_loss += client.loss
+                    
+                # remove output and loss from memory
+                for _, client in clients.items():
+                    del client.activations1
+                    del client.remote_activations1
+                    del client.remote_activations2
+                    del client.outputs
+                    del client.loss
+                    del client.data
+                    del client.targets
 
 
             # [Differential Privacy] get back epsilon with delta values
@@ -531,6 +549,17 @@ if __name__ == "__main__":
     plt.ioff()
     plt.savefig(f'./results/epsilon_vs_epoch/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
     plt.show()
+
+
+    plt.plot(first_client.front_epsilons, overall_acc)
+    plt.title(f'{args.number_of_clients} Accuracy vs. Epsilon')
+    plt.ylabel('Epsilon')
+    plt.xlabel('Average Test Acc.')
+    plt.legend()
+    plt.ioff()
+    plt.savefig(f'./results/acc_vs_epsilon/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
+    plt.show()
+
 
 
     # picking up a random client and testing it's accuracy on overall test dataset
