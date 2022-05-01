@@ -82,14 +82,14 @@ def parse_arguments():
         "-n",
         "--epochs",
         type=int,
-        default=3,
+        default=10,
         metavar="N",
         help="number of epochs to train",
     )
     parser.add_argument(
         "--lr",
         type=float,
-        default=0.05,
+        default=0.01,
         metavar="LR",
         help="learning rate",
     )

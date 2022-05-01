@@ -89,7 +89,7 @@ criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=0.01,momentum=0.9)
 # optim = torch.optim.Adam(model.parameters(), lr=0.01)
 
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True)
+# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True)
 
 # save_path = os.path.join(r"trained_models", f'{datetime.now().strftime("%m%d_%H%M%S")}.pth')
 
@@ -140,7 +140,7 @@ def train_val():
                 running_val_loss = running_val_loss/len(val_loader)
                 print(f"Val Loss: {running_val_loss:.3f}\tVal Acc: {correct/total}")
                 
-                scheduler.step(running_val_loss)
+                # scheduler.step(running_val_loss)
 
 
 train_val()
