@@ -1,168 +1,146 @@
-from __future__ import print_function
-import argparse
+# Importing Dependencies
+
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
-from torchvision import datasets, transforms
-from torch.optim.lr_scheduler import StepLR
+from torchvision.datasets import CIFAR10
+from torchvision import transforms
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from datetime import datetime
 
+# Defining model
+arch = [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M']
 
-VGG16 = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M']
-#implementing VGG-16 for cifar10
-
-
-class VGG(nn.Module):
-    def __init__(self, vgg_name):
-        super(VGG, self).__init__()
-        self.features = self._make_layers(VGG16)
-        self.classifier = nn.Linear(512, 10)
+class VGGNet(nn.Module):
+    def __init__(self, in_channels, num_classes):
+        super().__init__()
+        self.in_channels = in_channels
+        self.conv_layers = self.create_conv_layers(arch)
+        self.fcs = nn.Sequential(
+            nn.Linear(in_features=512*1*1, out_features=4096),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(in_features=4096, out_features=4096),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(4096, num_classes)
+        )
 
     def forward(self, x):
-        out = self.features(x)
-        out = out.view(out.size(0), -1)
-        out = self.classifier(out)
-        return out
+        x = self.conv_layers(x)
+        # print(x.shape)
+        x = x.reshape(x.shape[0], -1)
+        x = self.fcs(x)
+        return x
 
-    def _make_layers(self, cfg):
+    def create_conv_layers(self, arch):
         layers = []
-        in_channels = 3
-        for x in cfg:
-            if x == 'M':
-                layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
-            else:
-                layers += [nn.Conv2d(in_channels, x, kernel_size=3, padding=1),
-                           nn.BatchNorm2d(x),
-                           nn.ReLU(inplace=True)]
+        in_channels = self.in_channels
+        
+        for x in arch:            
+            
+            if type(x) == int:
+
+                out_channels = x
+                layers += [nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+                        nn.BatchNorm2d(x), 
+                        nn.ReLU(),
+                        ]
+
                 in_channels = x
-        layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
+            
+            elif x =='M':
+                layers += [nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))]
+
         return nn.Sequential(*layers)
 
+# Hyperparameters and settings
 
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3, 1)
-        self.conv2 = nn.Conv2d(32, 64, 3, 1)
-        self.dropout1 = nn.Dropout(0.25)
-        self.dropout2 = nn.Dropout(0.5)
-        self.fc1 = nn.Linear(9216, 128)
-        self.fc2 = nn.Linear(128, 10)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(device)
+TRAIN_BATCH_SIZE = 64
+VAL_BATCH_SIZE = 16
+EPOCHS = 10
 
-    def forward(self, x):
-        x = self.conv1(x)
-        x = F.relu(x)
-        x = self.conv2(x)
-        x = F.relu(x)
-        x = F.max_pool2d(x, 2)
-        x = self.dropout1(x)
-        x = torch.flatten(x, 1)
-        x = self.fc1(x)
-        x = F.relu(x)
-        x = self.dropout2(x)
-        x = self.fc2(x)
-        output = F.log_softmax(x, dim=1)
-        return output
+train_data = CIFAR10(root=".", train=True, 
+                    transform=transforms.Compose([transforms.ToTensor()]), download=True)
+
+# print(len(train_data))
+val_data = CIFAR10(root=".", train=False,
+                    transform=transforms.Compose([transforms.ToTensor()]), download=True)
+# print(len(val_data))
 
 
-def train(args, model, device, train_loader, optimizer, epoch):
-    model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output, target)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item()))
-            if args.dry_run:
-                break
+train_loader = DataLoader(train_data, batch_size=TRAIN_BATCH_SIZE, shuffle=True, num_workers=8)
+val_loader = DataLoader(val_data, batch_size=VAL_BATCH_SIZE, shuffle=True, num_workers=8)
+# print(len(train_loader))
+# print(len(val_loader))
 
 
-def test(model, device, test_loader):
-    model.eval()
-    test_loss = 0
-    correct = 0
-    with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
-            pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-            correct += pred.eq(target.view_as(pred)).sum().item()
+num_train_batches = int(len(train_data)/TRAIN_BATCH_SIZE) 
+num_val_batches = int(len(val_data)/VAL_BATCH_SIZE)
 
-    test_loss /= len(test_loader.dataset)
+# Training and Val Loop
 
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+model = VGGNet(3, 10).to(device)
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01,momentum=0.9)
+# optim = torch.optim.Adam(model.parameters(), lr=0.01)
 
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True)
 
-def main():
-    # Training settings
-    parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
-    parser.add_argument('--batch-size', type=int, default=64, metavar='N',
-                        help='input batch size for training (default: 64)')
-    parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
-                        help='input batch size for testing (default: 1000)')
-    parser.add_argument('--epochs', type=int, default=14, metavar='N',
-                        help='number of epochs to train (default: 14)')
-    parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
-                        help='learning rate (default: 1.0)')
-    parser.add_argument('--gamma', type=float, default=0.7, metavar='M',
-                        help='Learning rate step gamma (default: 0.7)')
-    parser.add_argument('--no-cuda', action='store_true', default=False,
-                        help='disables CUDA training')
-    parser.add_argument('--dry-run', action='store_true', default=False,
-                        help='quickly check a single pass')
-    parser.add_argument('--seed', type=int, default=1, metavar='S',
-                        help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=10, metavar='N',
-                        help='how many batches to wait before logging training status')
-    parser.add_argument('--save-model', action='store_true', default=False,
-                        help='For Saving the current Model')
-    args = parser.parse_args()
-    use_cuda = not args.no_cuda and torch.cuda.is_available()
+# save_path = os.path.join(r"trained_models", f'{datetime.now().strftime("%m%d_%H%M%S")}.pth')
 
-    torch.manual_seed(args.seed)
+def train_val():
+    
+    for epoch in range(1, EPOCHS+1):
+        print(f"Epoch: {epoch}/{EPOCHS}", end='\t')
+        model.train()
+        
+        running_loss = 0
+        total = 0
+        correct = 0
+        for data in train_loader:
+            image, target = data[0], data[1]
+            image, target = image.to(device), target.to(device) 
+            optimizer.zero_grad()
+            output = model(image)
+            loss = criterion(output, target) 
+            running_loss += loss.item()
+            
+            _, pred = torch.max(output, dim=1)
+            total += target.size(0)
+            correct += torch.sum(pred == target).item()
+            
+            loss.backward()
+            optimizer.step()
+        print(f"Training Loss: {running_loss/len(train_loader):.3f}\tTraining Acc: {correct/total}", end='\t')
+        
+        save_path = os.path.join(r"trained_models", f'{datetime.now().strftime("%m%d_%H%M%S")}_{epoch}.pth')
 
-    device = torch.device("cuda" if use_cuda else "cpu")
-
-    train_kwargs = {'batch_size': args.batch_size}
-    test_kwargs = {'batch_size': args.test_batch_size}
-    if use_cuda:
-        cuda_kwargs = {'num_workers': 1,
-                       'pin_memory': True,
-                       'shuffle': True}
-        train_kwargs.update(cuda_kwargs)
-        test_kwargs.update(cuda_kwargs)
-
-    transform=transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
-        ])
-    dataset1 = datasets.MNIST('../data', train=True, download=True,
-                       transform=transform)
-    dataset2 = datasets.MNIST('../data', train=False,
-                       transform=transform)
-    train_loader = torch.utils.data.DataLoader(dataset1,**train_kwargs)
-    test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
-
-    model = Net().to(device)
-    optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
-
-    scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
-    for epoch in range(1, args.epochs + 1):
-        train(args, model, device, train_loader, optimizer, epoch)
-        test(model, device, test_loader)
-        scheduler.step()
-
-    if args.save_model:
-        torch.save(model.state_dict(), "mnist_cnn.pt")
+        if epoch % 10 == 0:
+            torch.save(model.state_dict(), save_path)
+            with torch.no_grad():
+                
+                model.eval()
+                running_val_loss = 0
+                total = 0
+                correct = 0
+                for data in val_loader:
+                    image, target = data[0], data[1]
+                    image, target = image.to(device), target.to(device) 
+                    output = model(image)
+                    val_loss = criterion(output, target)
+                    running_val_loss += val_loss
+                    _, pred = torch.max(output, dim=1)
+                    correct += torch.sum(pred == target).item()
+                    total += target.size(0)
+                running_val_loss = running_val_loss/len(val_loader)
+                print(f"Val Loss: {running_val_loss:.3f}\tVal Acc: {correct/total}")
+                
+                scheduler.step(running_val_loss)
 
 
-if __name__ == '__main__':
-    main()
+train_val()
