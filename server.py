@@ -77,7 +77,7 @@ def main(server_pipe_endpoints, args):
 
 
     for client_id in connected_clients:
-        # import model asked by the user
+        # import model requested by the user
         model = importlib.import_module(f'models.{args.model}')
         client = connected_clients[client_id]
         client.front_model = model.front()

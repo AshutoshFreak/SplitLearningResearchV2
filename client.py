@@ -111,7 +111,6 @@ class Client(Thread):
     def forward_front(self):
         self.data, self.targets = next(self.iterator)
         self.data, self.targets = self.data.to(self.device), self.targets.to(self.device)
-        # print(self.data.get_device())
         self.front_model.to(self.device)
         self.activations1 = self.front_model(self.data)
         self.remote_activations1 = self.activations1.detach().requires_grad_(True)

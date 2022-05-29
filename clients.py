@@ -25,11 +25,11 @@ from opacus.validators import ModuleValidator
 import torch.optim as optim
 import argparse
 import copy
+from datetime import datetime
+from scipy.interpolate import make_interp_spline
+import numpy as np
 
 
-# SEED = 2647
-# random.seed(SEED)
-# torch.manual_seed(SEED)
 
 
 # sets client attributes passed to the function
@@ -140,16 +140,16 @@ def parse_arguments():
         help="States dataset to be used",
     )
     parser.add_argument(
+        "--seed",
+        type=int,
+        default=2647,
+        help="Random seed",
+    )
+    parser.add_argument(
         "--model",
         type=str,
         default="MNIST_CNN",
         help="Model you would like to train",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=2647,
-        help="Random Seed",
     )
     args = parser.parse_args()
     return args
@@ -163,6 +163,9 @@ if __name__ == "__main__":
     torch.multiprocessing.set_sharing_strategy('file_system')
 
     args = parse_arguments()
+
+    random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
     random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -195,10 +198,9 @@ if __name__ == "__main__":
     with Executor() as executor:
         # define normalization transform
         # transform=transforms.Compose([
-        #         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        #         transforms.Normalize((0.1307,), (0.3081,))
         #         ])
-        transform = None
-
+        transform=None
 
         ## client object initialization phase
         print('Initializing clients...')
@@ -234,9 +236,8 @@ if __name__ == "__main__":
         #     print(client.front_model)
 
         # for _, client in clients.items():
-            # print(client.device)
-            # client.front_model.to(client.device)
-            # client.back_model.to(client.device)
+        #     client.front_model.to(client.device)
+        #     client.back_model.to(client.device)
 
 
         # [server side tuning]
@@ -531,37 +532,83 @@ if __name__ == "__main__":
                 print(f'Test Acc: {overall_acc[-1]}')
 
 
-    for client_id, client in clients.items():
-        plt.plot(list(range(args.epochs)), client.test_acc, label=f'{client_id} (Max:{max(client.test_acc):.4f})')
-    plt.plot(list(range(args.epochs)), overall_acc, label=f'Average (Max:{max(overall_acc):.4f})')
+    # for client_id, client in clients.items():
+    #     plt.plot(list(range(args.epochs)), client.test_acc, label=f'{client_id} (Max:{max(client.test_acc):.4f})')
+    # plt.plot(list(range(args.epochs)), overall_acc, label=f'Average (Max:{max(overall_acc):.4f})')
+    # plt.title(f'{args.number_of_clients} Clients: Test Accuracy vs. Epochs')
+    # plt.ylabel('Test Accuracy')
+    # plt.xlabel('Epochs')
+    # plt.legend()
+    # plt.ioff()
+    # plt.savefig(f'./results/test_acc_vs_epoch/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
+    # plt.show()
+
+
+    # plt.plot(list(range(args.epochs)), first_client.front_epsilons)
+    # plt.title(f'{args.number_of_clients} Clients: Epsilon vs. Epochs')
+    # plt.ylabel('Epsilon')
+    # plt.xlabel('Epochs')
+    # plt.legend()
+    # plt.ioff()
+    # plt.savefig(f'./results/epsilon_vs_epoch/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
+    # plt.show()
+
+
+    timestamp = int(datetime.now().timestamp())
+    plot_config = f'''dataset: {args.dataset},
+                    model: {args.model},
+                    batch_size: {args.batch_size}, lr: {args.lr},
+                    server side tuning: {args.server_side_tuning},
+                    sigma: {args.sigma}, delta: {args.delta}'''
+
+    # for client_id, client in clients.items():
+    #     plt.plot(list(range(args.epochs)), client.test_acc, label=f'{client_id} (Max:{max(client.test_acc):.4f})')
+    X_ = list(range(args.epochs))
+    Y_ = overall_acc
+    X_Y_Spline = make_interp_spline(X_, Y_)
+    X_ = np.linspace(min(X_), max(X_), 100)
+    Y_ = X_Y_Spline(X_)
+    ci = 0.3*np.std(Y_)/np.sqrt(len(X_))
+    plt.fill_between(X_, (Y_-ci), (Y_+ci), color='blue', alpha=0.5)
+    plt.plot(X_, Y_, label=f'Average (Max:{max(Y_):.4f})')
     plt.title(f'{args.number_of_clients} Clients: Test Accuracy vs. Epochs')
     plt.ylabel('Test Accuracy')
     plt.xlabel('Epochs')
     plt.legend()
     plt.ioff()
-    plt.savefig(f'./results/test_acc_vs_epoch/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
+    plt.figtext(0.45, -0.06, plot_config, ha="center", va="center", fontsize=10)
+    plt.savefig(f'./results/test_acc_vs_epoch/{timestamp}.png', bbox_inches='tight')
     plt.close()
 
 
-    plt.plot(list(range(args.epochs)), first_client.front_epsilons)
-    plt.title(f'{args.number_of_clients} Clients: Epsilon vs. Epochs')
-    plt.ylabel('Epsilon')
-    plt.xlabel('Epochs')
-    plt.legend()
-    plt.ioff()
-    plt.savefig(f'./results/epsilon_vs_epoch/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
-    plt.close()
+    # plt.plot(list(range(args.epochs)), first_client.front_epsilons)
+    # plt.title(f'{args.number_of_clients} Clients: Epsilon vs. Epochs')
+    # plt.ylabel('Epsilon')
+    # plt.xlabel('Epochs')
+    # plt.legend()
+    # plt.ioff()
+    # plt.figtext(0.45, -0.06, plot_config, ha="center", va="center", fontsize=10)
+    # plt.savefig(f'./results/epsilon_vs_epoch/{timestamp}.png', bbox_inches='tight')
+    # plt.close()
 
 
-    plt.plot(first_client.front_epsilons, overall_acc)
+    X_ = first_client.front_epsilons
+    Y_ = overall_acc
+    X_Y_Spline = make_interp_spline(X_, Y_)
+    X_ = np.linspace(min(X_), max(X_), 100)
+    Y_ = X_Y_Spline(X_)
+    ci = 0.5*np.std(Y_)/np.sqrt(len(X_))
+    plt.fill_between(X_, (Y_-ci), (Y_+ci), color='blue', alpha=0.5)
+    print(ci)
+    plt.plot(X_, Y_)
     plt.title(f'{args.number_of_clients} Accuracy vs. Epsilon')
     plt.ylabel('Average Test Acc.')
     plt.xlabel('Epsilon')
     plt.legend()
     plt.ioff()
-    plt.savefig(f'./results/acc_vs_epsilon/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
+    plt.figtext(0.45, -0.06, plot_config, ha="center", va="center", fontsize=10)
+    plt.savefig(f'./results/acc_vs_epsilon/{timestamp}.png', bbox_inches='tight')
     plt.close()
-
 
 
     # picking up a random client and testing it's accuracy on overall test dataset
