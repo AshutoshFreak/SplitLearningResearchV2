@@ -9,10 +9,10 @@ import time
 import torch
 from math import ceil
 from torchvision import transforms
-from concurrent.futures import ProcessPoolExecutor as Executor
 from utils.split_dataset import split_dataset
 from utils.client_simulation import generate_random_clients
-from utils.connections import send_object
+from utils.connections import 
+from utils.arg_parser import parse_arguments
 import matplotlib.pyplot as plt
 import time
 import server
@@ -22,14 +22,11 @@ from opacus.accountants import RDPAccountant
 from opacus import GradSampleModule
 from opacus.optimizers import DPOptimizer
 from opacus.validators import ModuleValidator
-import torch.optim as optim
-import argparse
+import torch.optim as optim 
 import copy
 from datetime import datetime
 from scipy.interpolate import make_interp_spline
 import numpy as np
-
-
 
 
 # sets client attributes passed to the function
@@ -37,122 +34,6 @@ def initialize_client(client, dataset, batch_size, test_batch_size, tranform=Non
     client.load_data(args.dataset, transform)
     print(f'Length of train dataset client {client.id}: {len(client.train_dataset)}')
     client.create_DataLoader(batch_size, test_batch_size)
-
-
-def parse_arguments():
-    # Training settings
-    parser = argparse.ArgumentParser(
-        description="Split Learning Research Simulation entrypoint",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-
-    parser.add_argument(
-        "-c",
-        "--number-of-clients",
-        type=int,
-        default=20,
-        metavar="C",
-        help="Number of Clients",
-    )
-    parser.add_argument(
-        "--server-side-tuning",
-        # action=argparse.BooleanOptionalAction,
-        type=bool,
-        default=True,
-        metavar="SST",
-        help="State if server side tuning needs to be done",
-    )
-    parser.add_argument(
-        "-b",
-        "--batch-size",
-        type=int,
-        default=32,
-        metavar="B",
-        help="Batch size",
-    )
-    parser.add_argument(
-        "--test-batch-size",
-        type=int,
-        default=32,
-        metavar="TB",
-        help="input batch size for testing",
-    )
-    parser.add_argument(
-        "-n",
-        "--epochs",
-        type=int,
-        default=3,
-        metavar="N",
-        help="number of epochs to train",
-    )
-    parser.add_argument(
-        "--lr",
-        type=float,
-        default=0.05,
-        metavar="LR",
-        help="learning rate",
-    )
-    parser.add_argument(
-        "--sigma",
-        type=float,
-        default=1.0,
-        metavar="S",
-        help="Noise multiplier",
-    )
-    parser.add_argument(
-        "--server-sigma",
-        type=float,
-        default=0,
-        metavar="SS",
-        help="Noise multiplier for central layers",
-    )
-    parser.add_argument(
-        "-g",
-        "--max-per-sample-grad_norm",
-        type=float,
-        default=1.0,
-        metavar="G",
-        help="Clip per-sample gradients to this norm",
-    )
-    parser.add_argument(
-        "--delta",
-        type=float,
-        default=1e-5,
-        metavar="D",
-        help="Target delta",
-    )
-    parser.add_argument(        # needs to be implemented
-        "--save-model",
-        action="store_true",
-        default=False,
-        help="Save the trained model",
-    )
-    parser.add_argument(
-        "--disable-dp",
-        action="store_true",
-        default=False,
-        help="Disable privacy training and just train with vanilla SGD",
-    )
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        default="mnist",
-        help="States dataset to be used",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=2647,
-        help="Random seed",
-    )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="MNIST_CNN",
-        help="Model you would like to train",
-    )
-    args = parser.parse_args()
-    return args
 
 
 def select_random_clients(clients):
@@ -175,9 +56,6 @@ if __name__ == "__main__":
     random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    random.seed(args.seed)
-    torch.manual_seed(args.seed)
-
     # pipe endpoints for process communication through common memory space meant for server
     server_pipe_endpoints = {}
 
@@ -195,7 +73,6 @@ if __name__ == "__main__":
     clients = generate_random_clients(args.number_of_clients)
     client_ids = list(clients.keys())    
     print('Done')
-
 
     # split dataset between clients
     split_dataset(args.dataset, client_ids)
@@ -224,18 +101,15 @@ if __name__ == "__main__":
     for client_id in clients:
         server_pipe_endpoints[client_id] = clients[client_id].server_socket
 
-
     # start server as a child process and provide client pipe endpoints
     p = multiprocessing.Process(target=server.main, args=(server_pipe_endpoints, args))
     p.start()
     
-
     # all clients get model from the server
     print('Getting model from server...', end='')
     for _, client in clients.items():
         client.get_model()
     print('Done')
-
 
     # # for [manual] verification of successful transfer, printing front model
     # for _, client in clients.items():
@@ -244,7 +118,6 @@ if __name__ == "__main__":
     # for _, client in clients.items():
     #     client.front_model.to(client.device)
     #     client.back_model.to(client.device)
-
 
     # [server side tuning]
     if args.server_side_tuning:
@@ -256,12 +129,10 @@ if __name__ == "__main__":
         dummy_client = clients[dummy_client_id]
         clients.pop(dummy_client_id)
 
-
     # [Differential Privacy]
     # Initialize front PrivacyEngine
     for _, client in clients.items():
         client.front_privacy_engine = PrivacyEngine()
-
 
     # initialize optimizer for each client
     for _, client in clients.items():
@@ -272,7 +143,6 @@ if __name__ == "__main__":
     if args.server_side_tuning:
         # initialize front optimizer for dummy client
         dummy_client.front_optimizer = optim.SGD(dummy_client.front_model.parameters(), lr=args.lr, momentum=0.9)
-
 
     # [Differential Privacy]
     # Update front_model, front_optimizer and train_Dataloader to be Differentially Private
@@ -322,7 +192,6 @@ if __name__ == "__main__":
         # initialize back optimizer for dummy client
         dummy_client.back_optimizer = optim.SGD(dummy_client.back_model.parameters(), lr=args.lr, momentum=0.9)
 
-
     # calculate number of iterations
     # Assume each client has exactly same number of datapoints
     # take number of datapoints of first client and divide with batch_size
@@ -330,15 +199,15 @@ if __name__ == "__main__":
     num_iterations = ceil(len(first_client.train_DataLoader.dataset)/args.batch_size)
     num_test_iterations = ceil(len(first_client.test_DataLoader.dataset)/args.batch_size)
 
-
     # Communicate epochs and number of iterations to server before training
     send_object(first_client.socket, (num_iterations, num_test_iterations))
 
     # Training
     for epoch in range(args.epochs):
         # select random clients and communicate with server
-        random_clients = select_random_clients(clients)
-        send_object(first_client.socket, random_clients.keys())
+        if epoch%epoch_batch == 0:
+            random_clients = select_random_clients(clients)
+            send_object(first_client.socket, random_clients.keys())
 
         # # initialize optimizer for each client
         # for _, client in random_clients.items():
@@ -355,51 +224,41 @@ if __name__ == "__main__":
             for _, client in random_clients.items():
                 client.forward_front()
 
-
             # send activations to the server at each client
             for _, client in random_clients.items():
                 client.send_remote_activations1()
-
 
             # get remote activations from server at each client
             for _, client in random_clients.items():
                 client.get_remote_activations2()
 
-
             # forward prop for back model at each client
             for _, client in random_clients.items():
                 client.forward_back()
-
 
             # calculate loss at each client
             for _, client in random_clients.items():
                 client.calculate_loss()
 
-
             # # calculate training accuracy at each client
             # for _, client in random_clients.items():
             #     (client.calculate_train_acc())
-
 
             # backprop for back model at each client
             for _, client in random_clients.items():
                 client.backward_back()
 
-
             # send gradients to server
             for _, client in random_clients.items():
                 client.send_remote_activations2_grads()
-
 
             # get gradients from server
             for _, client in random_clients.items():
                 client.get_remote_activations1_grads()
 
-
             # backprop for front model at each client
             for _, client in random_clients.items():
                 client.backward_front()
-
 
             # update weights of both front and back model at each client
             for _, client in random_clients.items():
@@ -410,21 +269,9 @@ if __name__ == "__main__":
             for _, client in random_clients.items():
                 client.zero_grad()
 
-
             # add losses for each iteration
             for _, client in random_clients.items():
                 client.running_loss += client.loss
-                
-            # remove output and loss from memory
-            for _, client in random_clients.items():
-                del client.activations1
-                del client.remote_activations1
-                del client.remote_activations2
-                del client.outputs
-                del client.loss
-                del client.data
-                del client.targets
-
 
         # [Differential Privacy] get back epsilon with delta values
         for _, client in random_clients.items():
@@ -432,7 +279,6 @@ if __name__ == "__main__":
             client.front_epsilons.append(front_epsilon)
             client.front_best_alphas.append(front_best_alpha)
             print(f"([{client.id}] ε = {front_epsilon:.2f}, δ = {args.delta}) for α = {front_best_alpha}")
-
 
         # [server side tuning]
         if args.server_side_tuning:
@@ -486,15 +332,12 @@ if __name__ == "__main__":
             overall_loss[-1] += loss
         overall_loss[-1] /= num_iterations
 
-        
-
             # train_acc = 0
             # # average out accuracy of all random_clients
             # for _, client in random_clients.items():
             #     train_acc += client.train_acc[-1]
             # train_acc = train_acc/args.number_of_clients
             # overall_acc.append(train_acc)
-
 
         # Testing
         with torch.no_grad():
@@ -507,62 +350,33 @@ if __name__ == "__main__":
                 for _, client in random_clients.items():
                     client.iterator = iter(client.test_DataLoader)
 
-
                 # call forward prop for each client
                 for _, client in random_clients.items():
                     client.forward_front()
-
 
                 # send activations to the server
                 for _, client in random_clients.items():
                     client.send_remote_activations1()
 
-
                 for _, client in random_clients.items():
                     client.get_remote_activations2()
-
 
                 for _, client in random_clients.items():
                     client.forward_back()
 
-
                 # for _, client in random_clients.items():
                 #     (client.calculate_loss())
 
-
                 for _, client in random_clients.items():
                     client.test_acc[-1] += client.calculate_test_acc()
-            
+
             for _, client in random_clients.items():
                 client.test_acc[-1] /= num_test_iterations
                 overall_acc[-1] += client.test_acc[-1]
-            
+
             overall_acc[-1] /= len(random_clients)
             # print(f'Acc for epoch {epoch+1}: {overall_acc[-1]}')
             print(f'Test Acc: {overall_acc[-1]}')
-
-
-    # for client_id, client in random_clients.items():
-    #     plt.plot(list(range(args.epochs)), client.test_acc, label=f'{client_id} (Max:{max(client.test_acc):.4f})')
-    # plt.plot(list(range(args.epochs)), overall_acc, label=f'Average (Max:{max(overall_acc):.4f})')
-    # plt.title(f'{args.number_of_clients} Clients: Test Accuracy vs. Epochs')
-    # plt.ylabel('Test Accuracy')
-    # plt.xlabel('Epochs')
-    # plt.legend()
-    # plt.ioff()
-    # plt.savefig(f'./results/test_acc_vs_epoch/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
-    # plt.show()
-
-
-    # plt.plot(list(range(args.epochs)), first_client.front_epsilons)
-    # plt.title(f'{args.number_of_clients} Clients: Epsilon vs. Epochs')
-    # plt.ylabel('Epsilon')
-    # plt.xlabel('Epochs')
-    # plt.legend()
-    # plt.ioff()
-    # plt.savefig(f'./results/epsilon_vs_epoch/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
-    # plt.show()
-
 
     timestamp = int(datetime.now().timestamp())
     plot_config = f'''dataset: {args.dataset},
@@ -590,18 +404,6 @@ if __name__ == "__main__":
     plt.savefig(f'./results/test_acc_vs_epoch/{timestamp}.png', bbox_inches='tight')
     plt.close()
 
-
-    # plt.plot(list(range(args.epochs)), first_client.front_epsilons)
-    # plt.title(f'{args.number_of_clients} Clients: Epsilon vs. Epochs')
-    # plt.ylabel('Epsilon')
-    # plt.xlabel('Epochs')
-    # plt.legend()
-    # plt.ioff()
-    # plt.figtext(0.45, -0.06, plot_config, ha="center", va="center", fontsize=10)
-    # plt.savefig(f'./results/epsilon_vs_epoch/{timestamp}.png', bbox_inches='tight')
-    # plt.close()
-
-
     X_ = first_client.front_epsilons
     Y_ = overall_acc
     X_Y_Spline = make_interp_spline(X_, Y_)
@@ -620,7 +422,6 @@ if __name__ == "__main__":
     plt.savefig(f'./results/acc_vs_epsilon/{timestamp}.png', bbox_inches='tight')
     plt.close()
 
-
     # picking up a random client and testing it's accuracy on overall test dataset
     random_clients_overall_acc = {}
     for random_client_id in random_clients:
@@ -633,7 +434,6 @@ if __name__ == "__main__":
         random_client = random_clients[random_client_id]
         random_client_overall_acc = 0
         random_client.test_acc = []
-
 
         with torch.no_grad():
             for _, client in random_clients.items():
@@ -670,18 +470,3 @@ if __name__ == "__main__":
     # print(f'Test acc for random random_clients: {random_clients_overall_acc}')
     for client_id in random_clients_overall_acc:
         print(f'{client_id}: {random_clients_overall_acc[client_id]}')
-
-    # for client_id, client in random_clients.items():
-    #     plt.plot(list(range(args.epochs)), client.front_epsilons)
-    # plt.plot(list(range(args.epochs)), overall_loss)
-    # plt.title(f'{args.number_of_clients} Clients: Train Loss vs. Epochs')
-    # plt.ylabel('Train Loss')
-    # plt.xlabel('Epochs')
-    # plt.legend()
-    # plt.savefig(f'./results/train_loss_vs_epoch/{args.number_of_clients}_clients_{args.epochs}_epochs_{args.batch_size}_batch.png', bbox_inches='tight')
-    # plt.show()
-
-
-    # print('Test accuracy for each client:')
-    # for client_id, client in random_clients.items():
-    #         print(f'{client_id}:{client.test_acc}')a

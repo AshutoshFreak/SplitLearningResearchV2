@@ -8,7 +8,6 @@ import pickle
 import torch
 import random
 from utils.connections import get_object
-from concurrent.futures import ThreadPoolExecutor
 from utils.merge_grads import merge_grads
 import torch.optim as optim
 import multiprocessing
@@ -51,7 +50,6 @@ class AcceptClients(Thread):
         self.host = host
         self.port = port
         self.limit = limit
-    
 
     def run(self, server_pipe_endpoints):
         ServerSocket = multiprocessing.Pipe()
@@ -61,7 +59,6 @@ class AcceptClients(Thread):
             print(f'\n[*] Connected to: {client_id}')
             increaseThreadCount()
             print(f'Total clients connected: {ThreadCount}')
-        
         return ServerSocket
 
 
@@ -75,7 +72,6 @@ def main(server_pipe_endpoints, args):
     # time.sleep(10)
     # accept_clients.stop()
 
-
     for client_id in connected_clients:
         # import model requested by the user
         model = importlib.import_module(f'models.{args.model}')
@@ -83,7 +79,6 @@ def main(server_pipe_endpoints, args):
         client.front_model = model.front()
         client.back_model = model.back()
         client.center_model = model.center()
-
 
     for client_id in connected_clients:
         client = connected_clients[client_id]
@@ -100,8 +95,7 @@ def main(server_pipe_endpoints, args):
 
         # initialize optimizer
         client.center_optimizer = optim.SGD(client.center_model.parameters(), lr=0.05, momentum=0.9)
-        
-        
+
         # # [Differential Privacy]
         # # wrap optimizer
         # client.center_optimizer = DPOptimizer(
@@ -120,10 +114,8 @@ def main(server_pipe_endpoints, args):
         #     )
         # )
 
-
     for _, client in connected_clients.items():
         client.send_model()
-
 
     if args.server_side_tuning:
         # [Server side tuning]
@@ -147,14 +139,11 @@ def main(server_pipe_endpoints, args):
             for _, client in random_connected_clients.items():
                 client.get_remote_activations1()
 
-
             for _, client in random_connected_clients.items():
                 client.forward_center()
 
-
             for _, client in random_connected_clients.items():
                 client.send_remote_activations2()
-
 
             for _, client in random_connected_clients.items():
                 client.get_remote_activations2_grads()
@@ -168,10 +157,8 @@ def main(server_pipe_endpoints, args):
                 params.append(client.center_model.parameters())
             merge_grads(params)
 
-
             for _, client in random_connected_clients.items():
                 client.center_optimizer.step()
-
 
             for _, client in random_connected_clients.items():
                 client.center_optimizer.zero_grad()
@@ -221,9 +208,7 @@ def main(server_pipe_endpoints, args):
                 num_test_iterations = get_object(first_client.conn)
                 for iteration in range(num_test_iterations):
                     random_client.get_remote_activations1()
-
                     random_client.forward_center()
-
                     random_client.send_remote_activations2()
 
 if __name__ == "__main__":
