@@ -13,6 +13,7 @@ from utils.split_dataset import split_dataset
 from utils.client_simulation import generate_random_clients
 from utils.connections import 
 from utils.arg_parser import parse_arguments
+from utils.sharing_strategy as sharing_strategy
 import matplotlib.pyplot as plt
 import time
 import server
@@ -93,7 +94,6 @@ if __name__ == "__main__":
     # initialization phase complete
     print('Client Intialization complete.')
 
-
     # all clients connect to the server
     for _, client in clients.items():
         client.connect_server()
@@ -110,14 +110,6 @@ if __name__ == "__main__":
     for _, client in clients.items():
         client.get_model()
     print('Done')
-
-    # # for [manual] verification of successful transfer, printing front model
-    # for _, client in clients.items():
-    #     print(client.front_model)
-
-    # for _, client in clients.items():
-    #     client.front_model.to(client.device)
-    #     client.back_model.to(client.device)
 
     # [server side tuning]
     if args.server_side_tuning:
@@ -205,14 +197,10 @@ if __name__ == "__main__":
     # Training
     for epoch in range(args.epochs):
         # select random clients and communicate with server
-        if epoch%epoch_batch == 0:
+        if epoch % epoch_batch == 0:
             random_clients = select_random_clients(clients)
             send_object(first_client.socket, random_clients.keys())
 
-        # # initialize optimizer for each client
-        # for _, client in random_clients.items():
-        #     client.front_model = ModuleValidator.fix(client.front_model)
-        #     client.front_optimizer = optim.SGD(client.front_model.parameters(), lr=args.lr, momentum=0.9)
         # set iterator for each client and set running loss to 0
         for _, client in random_clients.items():
             client.iterator = iter(client.train_DataLoader)
@@ -263,7 +251,6 @@ if __name__ == "__main__":
             # update weights of both front and back model at each client
             for _, client in random_clients.items():
                 client.step()
-
 
             # zero out all gradients at each client
             for _, client in random_clients.items():
@@ -323,6 +310,15 @@ if __name__ == "__main__":
                 # add losses for each iteration
                 dummy_client.running_loss += dummy_client.loss
 
+        if epochs % epoch_batch == 0:
+            clients_loss = {}
+            for _, client in random_clients.items():
+                clients_loss[client.id] = client.running_loss
+            best_client_id = sharing_stragety.min_loss(clients_loss, 1)
+            share_model(clients_front_model, best_client_id)
+            share_model(clients_back_model, best_client_id)
+            share_central_model(first_client.socket, best_client_id)
+        
         overall_loss.append(0)
         avg_loss = 0
         # average out losses over all iterations for a single loss per epoch
@@ -365,7 +361,7 @@ if __name__ == "__main__":
                     client.forward_back()
 
                 # for _, client in random_clients.items():
-                #     (client.calculate_loss())
+                #     client.calculate_loss()
 
                 for _, client in random_clients.items():
                     client.test_acc[-1] += client.calculate_test_acc()
